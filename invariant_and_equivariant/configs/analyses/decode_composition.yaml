@@ -1,0 +1,18 @@
+name: decode_composition
+question: Can a delta readout learned on primitive motions generalize to composite motions?
+input: feature_difference
+target: delta_position_ref_camera
+train_pairs: primitive_grid_adjacent_train_only
+validation_pairs: primitive_grid_adjacent_validation_only
+test_pairs:
+  - primitive_test
+  - diagonal
+  - two_step
+  - reverse
+  - medium_distance
+  - random_valid_pair
+  - triplet_endpoint
+baselines:
+  - zero_prediction
+  - shuffled_label
+  - 2d_mask_bbox_delta

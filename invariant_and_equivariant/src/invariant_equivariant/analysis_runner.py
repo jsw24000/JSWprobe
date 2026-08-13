@@ -511,6 +511,205 @@ def run_intervention(config_path: Path) -> Dict[str, Any]:
     return {"metrics": len(metric_rows)}
 
 
+def _primitive_pair(config: Mapping[str, Any], pair: Mapping[str, Any]) -> bool:
+    tags = set(pair.get("pair_tags", []))
+    primitive_tags = set(config.get("decode_composition", config["composition"]).get("primitive_tags", config["composition"]["primitive_tags"]))
+    return pair.get("pair_type") == "grid_adjacent" and bool(primitive_tags.intersection(tags))
+
+
+def _composite_pair(config: Mapping[str, Any], pair: Mapping[str, Any]) -> bool:
+    tags = set(pair.get("pair_tags", []))
+    composite_cfg = config.get("decode_composition", config["composition"])
+    composite_types = set(composite_cfg.get("composite_pair_types", config["composition"]["composite_pair_types"]))
+    return pair.get("pair_type") in composite_types or "diagonal" in tags
+
+
+def _prefixed(metrics: Mapping[str, float], prefix: str) -> Dict[str, float]:
+    return {f"{prefix}_{name}": value for name, value in metrics.items()}
+
+
+def _decode_group_masks(config: Mapping[str, Any], pairs: Sequence[Mapping[str, Any]]) -> Dict[str, np.ndarray]:
+    masks_by_group = {
+        "primitive_train": np.asarray([p["split"] == "train" and _primitive_pair(config, p) for p in pairs], dtype=bool),
+        "primitive_validation": np.asarray([p["split"] == "validation" and _primitive_pair(config, p) for p in pairs], dtype=bool),
+        "primitive_test": np.asarray([p["split"] == "test" and _primitive_pair(config, p) for p in pairs], dtype=bool),
+        "composite": np.asarray([p["split"] == "test" and _composite_pair(config, p) for p in pairs], dtype=bool),
+        "diagonal": np.asarray([p["split"] == "test" and ("diagonal" in p.get("pair_tags", []) or p.get("pair_type") == "diagonal") for p in pairs], dtype=bool),
+        "two_step": np.asarray([p["split"] == "test" and p.get("pair_type") == "two-step" for p in pairs], dtype=bool),
+        "reverse": np.asarray([p["split"] == "test" and "reverse" in p.get("pair_tags", []) for p in pairs], dtype=bool),
+        "medium_distance": np.asarray([p["split"] == "test" and p.get("pair_type") == "medium-distance" for p in pairs], dtype=bool),
+        "random_valid_pair": np.asarray([p["split"] == "test" and p.get("pair_type") == "random_valid_pair" for p in pairs], dtype=bool),
+    }
+    return masks_by_group
+
+
+def run_decode_composition(config_path: Path) -> Dict[str, Any]:
+    """E8: train delta readout on primitive motions, evaluate composite motions."""
+    config = load_config(config_path)
+    output_dir = Path(config["_output_dir"])
+    out = ensure_dir(output_dir / "decode_composition")
+    grouped = grouped_feature_rows(output_dir)
+    manifests = load_manifests(config)
+    alphas = config["analysis"]["ridge_alphas"]
+    rng = np.random.default_rng(int(config["analysis"]["random_seed"]))
+    metric_rows: List[Dict[str, Any]] = []
+    pred_rows: List[Dict[str, Any]] = []
+    summary_rows: List[Dict[str, Any]] = []
+
+    for (model_name, layer_name), rows in grouped.items():
+        variant = rows[0]["model_variant"]
+        x, y, pairs = pair_arrays(config, rows, "ref")
+        if len(pairs) == 0:
+            continue
+        masks_by_group = _decode_group_masks(config, pairs)
+        train_mask = masks_by_group["primitive_train"]
+        val_mask = masks_by_group["primitive_validation"]
+        if train_mask.sum() < 1 or val_mask.sum() < 1:
+            continue
+        model = choose_alpha(x[train_mask], y[train_mask], x[val_mask], y[val_mask], alphas)
+        pred = model.predict(x)
+        ntrain, nval = int(train_mask.sum()), int(val_mask.sum())
+
+        for group_name, group_mask in masks_by_group.items():
+            if group_name in {"primitive_train", "primitive_validation"} or group_mask.sum() == 0:
+                continue
+            metrics = {
+                **_prefixed(regression_metrics(y[group_mask], pred[group_mask]), group_name),
+                **_prefixed(direction_metrics(y[group_mask], pred[group_mask]), group_name),
+            }
+            for name, value in metrics.items():
+                metric_rows.append(metric_row(config, model_name, variant, layer_name, name, value, "test", "ref", ntrain, nval, int(group_mask.sum())))
+
+        for idx, pair in enumerate(pairs):
+            if pair["split"] != "test":
+                continue
+            pred_rows.append(
+                {
+                    "model_name": model_name,
+                    "layer_name": layer_name,
+                    "record_type": "pair",
+                    "pair_id": pair["pair_id"],
+                    "scene_id": pair["scene_id"],
+                    "camera_id": pair["camera_id"],
+                    "state_a": pair["state_a"],
+                    "state_b": pair["state_b"],
+                    "pair_type": pair["pair_type"],
+                    "pair_tags": "|".join(pair.get("pair_tags", [])),
+                    "same_displacement_group": pair["same_displacement_group"],
+                    "distance": pair["distance"],
+                    "is_primitive_test": bool(masks_by_group["primitive_test"][idx]),
+                    "is_composite_test": bool(masks_by_group["composite"][idx]),
+                    "gt_dx": y[idx, 0],
+                    "gt_dy": y[idx, 1],
+                    "gt_dz": y[idx, 2],
+                    "pred_dx": pred[idx, 0],
+                    "pred_dy": pred[idx, 1],
+                    "pred_dz": pred[idx, 2],
+                }
+            )
+
+        model_to_npz(out / f"{model_name}_{layer_name}_primitive_delta_readout_weights.npz", model, {"coord": "ref", "train_pairs": ntrain, "validation_pairs": nval})
+        s = np.linalg.svd(model.weights.T, compute_uv=False)
+        write_csv(out / f"{model_name}_{layer_name}_singular_values.csv", [{"index": i, "singular_value": float(v)} for i, v in enumerate(s)])
+        summary_rows.append({"model_name": model_name, "layer_name": layer_name, "num_primitive_train": ntrain, "num_primitive_validation": nval, "num_composite_test": int(masks_by_group["composite"].sum()), "alpha": float(model.alpha)})
+
+        shuffled_y = y[train_mask].copy()
+        rng.shuffle(shuffled_y, axis=0)
+        shuffled = choose_alpha(x[train_mask], shuffled_y, x[val_mask], y[val_mask], alphas)
+        shuffled_pred = shuffled.predict(x)
+        zero = np.zeros_like(y)
+        for baseline_name, baseline_pred in [(f"{model_name}_shuffled_label_baseline", shuffled_pred), (f"{model_name}_zero_baseline", zero)]:
+            for group_name in ["primitive_test", "composite", "diagonal", "two_step", "reverse", "medium_distance", "random_valid_pair"]:
+                group_mask = masks_by_group[group_name]
+                if group_mask.sum() == 0:
+                    continue
+                metrics = {
+                    **_prefixed(regression_metrics(y[group_mask], baseline_pred[group_mask]), group_name),
+                    **_prefixed(direction_metrics(y[group_mask], baseline_pred[group_mask]), group_name),
+                }
+                for name, value in metrics.items():
+                    metric_rows.append(metric_row(config, baseline_name, variant, layer_name, name, value, "test", "ref", ntrain, nval, int(group_mask.sum())))
+
+        # Triplet endpoint decoding: decode state_0 -> state_2 total composition displacement.
+        valid_keys = {(r["scene_id"], r["state_id"], r["camera_id"]) for r in rows}
+        fmap = {(r["scene_id"], r["state_id"], r["camera_id"]): load_feature_vector(r["feature_path"], key="pooled_raw") for r in rows}
+        triplets = [t for t in filter_triplets(config, manifests, valid_keys) if t["split"] == "test"]
+        tx: List[np.ndarray] = []
+        ty: List[np.ndarray] = []
+        used_triplets: List[Mapping[str, Any]] = []
+        for triplet in triplets:
+            k0 = (triplet["scene_id"], triplet["state_0"], triplet["camera_id"])
+            k2 = (triplet["scene_id"], triplet["state_2"], triplet["camera_id"])
+            if k0 not in fmap or k2 not in fmap:
+                continue
+            tx.append(fmap[k2] - fmap[k0])
+            ty.append(np.asarray(triplet["delta_02_ref_camera"], dtype=np.float64))
+            used_triplets.append(triplet)
+        if tx:
+            tx_arr = np.asarray(tx, dtype=np.float64)
+            ty_arr = np.asarray(ty, dtype=np.float64)
+            triplet_pred = model.predict(tx_arr)
+            metrics = {
+                **_prefixed(regression_metrics(ty_arr, triplet_pred), "triplet"),
+                **_prefixed(direction_metrics(ty_arr, triplet_pred), "triplet"),
+            }
+            for name, value in metrics.items():
+                metric_rows.append(metric_row(config, model_name, variant, layer_name, name, value, "test", "ref", ntrain, nval, len(used_triplets)))
+            for idx, triplet in enumerate(used_triplets):
+                pred_rows.append(
+                    {
+                        "model_name": model_name,
+                        "layer_name": layer_name,
+                        "record_type": "triplet",
+                        "triplet_id": triplet["triplet_id"],
+                        "scene_id": triplet["scene_id"],
+                        "camera_id": triplet["camera_id"],
+                        "state_0": triplet["state_0"],
+                        "state_1": triplet["state_1"],
+                        "state_2": triplet["state_2"],
+                        "gt_dx": ty_arr[idx, 0],
+                        "gt_dy": ty_arr[idx, 1],
+                        "gt_dz": ty_arr[idx, 2],
+                        "pred_dx": triplet_pred[idx, 0],
+                        "pred_dy": triplet_pred[idx, 1],
+                        "pred_dz": triplet_pred[idx, 2],
+                    }
+                )
+
+    if grouped:
+        baseline_rows = next(iter(grouped.values()))
+        xb, yb, pairs_b = pair_arrays_2d(config, baseline_rows, "ref")
+        masks_by_group = _decode_group_masks(config, pairs_b)
+        train_mask = masks_by_group["primitive_train"]
+        val_mask = masks_by_group["primitive_validation"]
+        if train_mask.sum() > 0 and val_mask.sum() > 0:
+            baseline = choose_alpha(xb[train_mask], yb[train_mask], xb[val_mask], yb[val_mask], alphas)
+            baseline_pred = baseline.predict(xb)
+            for group_name in ["primitive_test", "composite", "diagonal", "two_step", "reverse", "medium_distance", "random_valid_pair"]:
+                group_mask = masks_by_group[group_name]
+                if group_mask.sum() == 0:
+                    continue
+                metrics = {
+                    **_prefixed(regression_metrics(yb[group_mask], baseline_pred[group_mask]), group_name),
+                    **_prefixed(direction_metrics(yb[group_mask], baseline_pred[group_mask]), group_name),
+                }
+                for name, value in metrics.items():
+                    metric_rows.append(metric_row(config, "2d_mask_bbox_decode_composition_baseline", "mask_bbox_camera_numeric", "mask_bbox_delta", name, value, "test", "ref", int(train_mask.sum()), int(val_mask.sum()), int(group_mask.sum()), "2d"))
+
+    write_csv(out / "metrics.csv", metric_rows)
+    write_json(out / "metrics.json", {"metrics": metric_rows})
+    write_csv(out / "predictions.csv", pred_rows)
+    write_csv(out / "train_eval_summary.csv", summary_rows)
+    (out / "report.md").write_text(
+        "# Decode Composition\n\n"
+        "E8 trains delta readout only on primitive train pairs and evaluates held-out primitive, composite, and triplet endpoint displacements.\n\n"
+        f"- Metric rows: {len(metric_rows)}\n"
+        f"- Prediction rows: {len(pred_rows)}\n",
+        encoding="utf-8",
+    )
+    return {"metrics": len(metric_rows), "predictions": len(pred_rows)}
+
+
 def run_composition(config_path: Path) -> Dict[str, Any]:
     config = load_config(config_path)
     output_dir = Path(config["_output_dir"])

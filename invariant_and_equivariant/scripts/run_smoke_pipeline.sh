@@ -55,6 +55,9 @@ run_step absolute_position "${STAMP_DIR}/absolute_position.done" \
 run_step delta_decode "${STAMP_DIR}/delta_decode.done" \
   python scripts/run_delta_decode.py --config "${CONFIG}"
 
+run_step decode_composition "${STAMP_DIR}/decode_composition.done" \
+  python scripts/run_decode_composition.py --config "${CONFIG}"
+
 run_step forward_equivariance "${STAMP_DIR}/forward_equivariance.done" \
   python scripts/run_forward_equivariance.py --config "${CONFIG}"
 

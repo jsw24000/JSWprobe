@@ -287,6 +287,53 @@ def plot_forward_vs_composition(rows: Sequence[Mapping[str, str]], out: Path) ->
     plt.close(fig)
 
 
+def plot_decode_composition(rows: Sequence[Mapping[str, str]], out: Path) -> None:
+    plt = setup_matplotlib()
+    panels = [
+        ("primitive_test_r2", "Primitive held-out R2"),
+        ("composite_r2", "Composite R2"),
+        ("diagonal_r2", "Diagonal R2"),
+        ("two_step_r2", "Two-step R2"),
+        ("triplet_r2", "Triplet endpoint R2"),
+        ("composite_direction_cosine", "Composite direction cosine"),
+    ]
+    fig, axes = plt.subplots(2, 3, figsize=(15, 7.5))
+    for ax, (metric, title) in zip(axes.ravel(), panels):
+        for model, layers in MODEL_LAYERS.items():
+            values = [metric_value(rows, "decode_composition", metric, model, layer) for layer in layers]
+            ax.plot(range(len(layers)), values, marker="o", linewidth=2, label=MODEL_LABELS[model])
+            ax.set_xticks(range(len(layers)))
+            ax.set_xticklabels(STAGE_LABELS)
+        ax.axhline(0, color="black", linewidth=0.8, alpha=0.5)
+        ax.set_title(title)
+        ax.set_ylabel(metric)
+    axes[0, 0].legend(frameon=False)
+    fig.suptitle("E8 Decode composition: primitive-trained delta readout generalization")
+    fig.tight_layout()
+    fig.savefig(out / "decode_composition_layerwise.png")
+    plt.close(fig)
+
+
+def plot_decode_vs_forward_composition(rows: Sequence[Mapping[str, str]], out: Path) -> None:
+    plt = setup_matplotlib()
+    fig, ax = plt.subplots(figsize=(7.0, 5.8))
+    for model, layers in MODEL_LAYERS.items():
+        xs = [metric_value(rows, "composition", "composite_forward_r2", model, layer) for layer in layers]
+        ys = [metric_value(rows, "decode_composition", "composite_r2", model, layer) for layer in layers]
+        ax.scatter(xs, ys, s=60, label=MODEL_LABELS[model])
+        for x, y, layer in zip(xs, ys, layers):
+            ax.text(x, y, layer.replace("aggregator_", ""), fontsize=8, ha="left", va="bottom")
+    ax.axhline(0, color="black", linewidth=0.8, alpha=0.5)
+    ax.axvline(0, color="black", linewidth=0.8, alpha=0.5)
+    ax.set_xlabel("E7 forward composition R2: delta_p -> delta_z")
+    ax.set_ylabel("E8 decode composition R2: delta_z -> delta_p")
+    ax.set_title("Forward composition versus decode composition")
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    fig.savefig(out / "decode_vs_forward_composition_r2.png")
+    plt.close(fig)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", type=Path, required=True)
@@ -308,6 +355,8 @@ def main() -> None:
     intervention_rows = read_csv(run_dir / "intervention" / "metrics.csv")
     plot_intervention(intervention_rows, out)
     plot_forward_vs_composition(rows, out)
+    plot_decode_composition(rows, out)
+    plot_decode_vs_forward_composition(rows, out)
 
     for path in sorted(out.glob("*.png")):
         print(path)
