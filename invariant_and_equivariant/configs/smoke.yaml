@@ -1,0 +1,58 @@
+run_name: smoke_v1
+paths_config: configs/paths.yaml
+output_dir: outputs/smoke_v1
+seed: 7
+device: cuda
+precision: bfloat16
+input_size: 224
+patch_size: 14
+representation_space: raw
+splits:
+  train: [scene_000, scene_001]
+  validation: [scene_002]
+  test: [scene_003]
+selection:
+  scenes: [scene_000, scene_001, scene_002, scene_003]
+  position_indices:
+    - [0, 0]
+    - [0, 1]
+    - [0, 2]
+    - [1, 0]
+    - [1, 1]
+    - [1, 2]
+    - [2, 0]
+    - [2, 1]
+    - [2, 2]
+  cameras: [camera_000, camera_003, camera_006, camera_009]
+pooling:
+  method: area_weighted
+  min_mask_area_ratio: 0.005
+  min_patch_coverage: 0.35
+  min_effective_patches: 1.5
+features:
+  force: false
+  save_patch_tokens: true
+  dtype: float16
+models:
+  dinov2:
+    enabled: true
+    config: configs/models/dinov2.yaml
+    layers: [block_05, block_11, block_17, block_last]
+    batch_size: 2
+  vggt:
+    enabled: true
+    config: configs/models/vggt.yaml
+    layers: [aggregator_block_04, aggregator_block_11, aggregator_block_17, aggregator_block_last]
+    views_per_state: 4
+analysis:
+  ridge_alphas: [0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0]
+  coordinate_systems: [ref, current, world]
+  main_coordinate_system: ref
+  subspace_rank: 2
+  effective_rank_threshold: 0.05
+  random_subspace_repeats: 5
+  random_seed: 7
+composition:
+  primitive_tags: [horizontal, vertical, short-distance]
+  composite_pair_types: [diagonal, two-step, medium-distance, random_valid_pair]
+

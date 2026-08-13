@@ -1,0 +1,83 @@
+experiment_name: controlled_16_staircase_exp_v4
+input_tokens_dir: outputs/tokens/controlled_16_staircase_exp_v4/
+input_manifest_dir: outputs/manifests/controlled_16_staircase_exp_v4/
+output_figures_dir: outputs/figures/controlled_16_staircase_exp_v4/
+output_metrics_dir: outputs/metrics/controlled_16_staircase_exp_v4/
+
+analysis_layers: &controlled_16_staircase_reverse_exp_v4_layers [4, 11, 17, 23]
+staircase_conditions: &controlled_16_staircase_reverse_exp_v4_conditions
+  - staircase_k00
+  - staircase_k01
+  - staircase_k02
+  - staircase_k03
+  - staircase_k04
+  - staircase_k05
+  - staircase_k06
+  - staircase_k07
+  - staircase_k08
+  - staircase_k09
+  - staircase_k10
+  - staircase_k11
+  - staircase_k12
+  - staircase_k13
+  - staircase_k14
+  - staircase_k15
+
+analysis:
+  methods:
+    - staircase_delta
+
+  experiment_name: controlled_16_staircase_exp_v4
+  token_type: patch_tokens
+  target_frame_id: 600
+  staircase_conditions: *controlled_16_staircase_reverse_exp_v4_conditions
+  analysis_layers: *controlled_16_staircase_reverse_exp_v4_layers
+  main_layer: 17
+
+  figures:
+    dpi: 180
+    save_png: true
+    save_pdf: false
+    colormap: viridis
+    pca_rgb_patch_size: 14
+    pca_rgb_upsample_mode: bilinear
+    contact_sheet_cols: 4
+    save_gif: false
+    save_individual_pca_pngs: false
+
+  runtime:
+    skip_missing: false
+    max_conditions_per_scene: null
+
+  staircase_delta:
+    pca_components: 3
+    shared_basis_across_configs: true
+    sign_alignment: max_abs_loading_positive
+    rgb_percentile_low: 1.0
+    rgb_percentile_high: 99.0
+    exclude_zero_b1_endpoint_from_fit: true
+    save_scores: true
+    save_rgb_arrays: true
+    save_delta_arrays: false
+    baseline_project: controlled_16_exp_v3
+    baseline_setting: prefix_induced_modulation
+    baseline_conditions:
+      X: X
+      B1: B1_local_relevant
+      C: C
+    endpoint_tolerance:
+      mean_abs: 1.0e-6
+      max_abs: 1.0e-4
+    object_mask:
+      enabled: true
+      path_template: "{source_scene_dir}/instance-filt/{target_frame_id}.png"
+      include_background: true
+      min_patch_count: 3
+      max_objects_for_plots: 16
+      saturation_thresholds: [0.5, 0.8, 0.9]
+
+smoke_test:
+  methods: [staircase_delta]
+  analysis_layers: [17]
+  main_layer: 17
+  required_sequences: *controlled_16_staircase_reverse_exp_v4_conditions

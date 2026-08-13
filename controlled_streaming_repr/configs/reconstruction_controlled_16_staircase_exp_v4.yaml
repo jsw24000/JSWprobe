@@ -1,0 +1,40 @@
+experiment_name: controlled_16_staircase_exp_v4
+reconstruction_target: lingbot-map-official-geometry
+experiment_config: configs/controlled_16_staircase_exp_v4.yaml
+manifest_index: outputs/manifests/controlled_16_staircase_exp_v4/index.json
+setting: controlled_16_staircase
+seq_len: 16
+
+geometry:
+  models: [lingbot-map]
+  device: cuda
+  image_size: 518
+  patch_size: 14
+  num_scale_frames: 8
+  camera_num_iterations: 4
+  keyframe_interval: 1
+  kv_cache_sliding_window: 64
+  max_frame_num: 1024
+  use_sdpa: true
+  save_dense_world_points: false
+
+outputs:
+  reconstruction_dir: outputs/reconstruction_official/controlled_16_staircase_exp_v4/
+  logs_dir: outputs/logs/controlled_16_staircase_exp_v4/
+
+command:
+  dry_run: >-
+    python scripts/run_controlled_geometry.py
+    --config configs/controlled_16_staircase_exp_v4.yaml
+    --manifest-index outputs/manifests/controlled_16_staircase_exp_v4/index.json
+    --models lingbot-map
+    --setting controlled_16_staircase
+    --seq-len 16
+    --dry-run
+  run: >-
+    python scripts/run_controlled_geometry.py
+    --config configs/controlled_16_staircase_exp_v4.yaml
+    --manifest-index outputs/manifests/controlled_16_staircase_exp_v4/index.json
+    --models lingbot-map
+    --setting controlled_16_staircase
+    --seq-len 16

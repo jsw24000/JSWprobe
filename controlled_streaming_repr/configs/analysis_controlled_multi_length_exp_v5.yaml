@@ -1,0 +1,49 @@
+experiment_name: controlled_multi_length_exp_v5
+input_tokens_dir: outputs/tokens/controlled_multi_length_exp_v5/
+input_manifest_dir: outputs/manifests/controlled_multi_length_exp_v5/
+output_figures_dir: outputs/figures/controlled_multi_length_exp_v5/
+output_metrics_dir: outputs/metrics/controlled_multi_length_exp_v5/
+
+analysis_layers: &controlled_multi_length_exp_v5_layers [4, 11, 17, 23]
+
+analysis:
+  methods:
+    - multi_length_delta
+
+  experiment_name: controlled_multi_length_exp_v5
+  token_type: patch_tokens
+  setting_name: controlled_multi_length
+  sequence_roles:
+    positive: B1
+    baseline: X
+  analysis_layers: *controlled_multi_length_exp_v5_layers
+  main_layer: 17
+
+  figures:
+    dpi: 180
+    save_png: true
+    save_pdf: false
+    colormap: viridis
+    pca_rgb_patch_size: 14
+    pca_rgb_upsample_mode: bilinear
+    contact_sheet_cols: 3
+
+  runtime:
+    skip_missing: false
+    max_conditions_per_scene: null
+
+  multi_length_delta:
+    pca_components: 3
+    fixed_pca_components: 3
+    sign_alignment: max_abs_loading_positive
+    rgb_percentile_low: 1.0
+    rgb_percentile_high: 99.0
+    save_scores: true
+    save_rgb_arrays: true
+    save_delta_arrays: false
+
+smoke_test:
+  methods: [multi_length_delta]
+  analysis_layers: [17]
+  main_layer: 17
+  required_sequences: [seg000_B1, seg000_X]

@@ -1,0 +1,14 @@
+experiment_name: "exp_template"
+status: "interface"
+model: "lingbot-map"
+sequence_id: null
+geometry_source: null
+token_bundle: null
+conditions: []
+analysis_methods:
+  - "pca"
+  - "gram"
+  - "rsa"
+  - "cka"
+  - "token_displacement"
+notes: "Template config only."

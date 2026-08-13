@@ -1,0 +1,3 @@
+probe: ridge
+baselines: [zero, shuffled_labels, mask_bbox_difference]
+

@@ -1,0 +1,70 @@
+scene: scene0000_00
+input_root: outputs/scene0000_00
+lingbot_root: ../lingbot-map
+output_root: outputs/scene0000_00/05_noise_slot_svd_debias
+
+stages: all
+slot_indices: all
+
+# Noise-slot can be expensive: max_slots=6 and two seeds gives 60 forwards.
+max_slots: 6
+max_noise_samples: null
+
+noise_types:
+  - gaussian
+  - smooth_noise
+  - gray
+  - hgrad
+  - vgrad
+
+noise_seeds:
+  - 0
+  - 1
+
+storage_dtype: float16
+
+k_list:
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+
+normalize_before_svd: l2
+center_before_svd: true
+
+projection:
+  normalize_before: true
+  center_mode: subspace_mean
+  normalize_after: true
+
+correspondence:
+  src_frame: 0
+  tgt_frame: 5
+  query_grid: 4
+  query_points: null
+
+visualization:
+  save_raw_heatmap_npy: true
+  save_debiased_heatmap_npy: true
+  heatmap_colormap: magma
+  overlay_alpha: 0.55
+
+metrics:
+  compute_positional_r2: true
+  compute_same_position_distance: true
+  compute_peakiness: true
+  compute_entropy: true
+  compute_top1_top2_gap: true
+  softmax_temperature: 0.07
+
+model:
+  image_size: 518
+  patch_size: 14
+  selected_idx: [4, 11, 17, 23]
+  num_scale_frames: 8
+  max_frame_num: 1024
+  kv_cache_sliding_window: 64
+  camera_num_iterations: 1
+  use_sdpa: true
+  device: cuda

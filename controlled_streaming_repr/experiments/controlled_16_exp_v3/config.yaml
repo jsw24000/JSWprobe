@@ -1,0 +1,13 @@
+experiment_name: controlled_16_exp_v3
+status: implemented
+model: lingbot-map
+experiment_config: configs/controlled_16_exp_v3.yaml
+analysis_config: configs/analysis_controlled_16_exp_v3.yaml
+sequence_setting: prefix_induced_modulation
+conditions:
+  - A_low_overlap
+  - B1_local_relevant
+  - B2_long_relevant
+analysis_methods:
+  - prefix_delta
+notes: Fixed-current-frame prefix-induced token modulation experiment.

@@ -1,0 +1,14 @@
+experiment_name: "exp03_geometry_appearance_conflict"
+status: "interface"
+model: "lingbot-map"
+sequence_id: null
+geometry_source: null
+token_bundle: null
+conditions: []
+analysis_methods:
+  - "pca"
+  - "gram"
+  - "rsa"
+  - "cka"
+  - "token_displacement"
+notes: "Define clean/conflict condition pairs before running."

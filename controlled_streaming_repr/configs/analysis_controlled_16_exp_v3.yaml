@@ -1,0 +1,78 @@
+experiment_name: controlled_16_exp_v3
+input_tokens_dir: outputs/tokens/controlled_16_exp_v3/
+input_manifest_dir: outputs/manifests/controlled_16_exp_v3/
+output_figures_dir: outputs/figures/controlled_16_exp_v3/
+output_metrics_dir: outputs/metrics/controlled_16_exp_v3/
+
+comparisons: &controlled_16_exp_v3_comparisons
+  - name: B1_minus_A
+    positive_sequence: B1_local_relevant
+    baseline_sequence: A_low_overlap
+  - name: B2_minus_A
+    positive_sequence: B2_long_relevant
+    baseline_sequence: A_low_overlap
+  - name: B1_minus_B2
+    positive_sequence: B1_local_relevant
+    baseline_sequence: B2_long_relevant
+    optional: true
+  - name: C_minus_X
+    positive_sequence: C
+    baseline_sequence: X
+  - name: B1_minus_X
+    positive_sequence: B1_local_relevant
+    baseline_sequence: X
+  - name: B2_minus_X
+    positive_sequence: B2_long_relevant
+    baseline_sequence: X
+  - name: B1_minus_C
+    positive_sequence: B1_local_relevant
+    baseline_sequence: C
+  - name: B2_minus_C
+    positive_sequence: B2_long_relevant
+    baseline_sequence: C
+
+analysis_layers: &controlled_16_exp_v3_layers [4, 11, 17, 23]
+main_layer: 17
+
+analysis:
+  methods:
+    - prefix_delta
+
+  experiment_name: controlled_16_exp_v3
+  token_type: patch_tokens
+  target_frame_id: 600
+  sequence_names:
+    - X
+    - A_low_overlap
+    - C
+    - B1_local_relevant
+    - B2_long_relevant
+  comparisons: *controlled_16_exp_v3_comparisons
+  analysis_layers: *controlled_16_exp_v3_layers
+  main_layer: 17
+
+  figures:
+    dpi: 180
+    save_png: true
+    save_pdf: false
+    colormap: viridis
+    pca_rgb_patch_size: 14
+    pca_rgb_upsample_mode: bilinear
+
+  runtime:
+    skip_missing: false
+    max_conditions_per_scene: null
+
+  prefix_delta:
+    pca_components: 5
+    fixed_pca_components: 3
+    fixed_pca_reference: combined_final_frame_tokens
+    save_delta_arrays: false
+    write_manifest_summary: true
+    write_markdown_summary: true
+
+smoke_test:
+  methods: [prefix_delta]
+  analysis_layers: [17]
+  main_layer: 17
+  required_sequences: [X, A_low_overlap, C, B1_local_relevant, B2_long_relevant]

@@ -1,0 +1,36 @@
+# Config for the official Oxford Spires downloader:
+#   python scripts/dataset_download.py --config /home/3dsm/Desktop/JSWprobe/oxford_spires_minimal/dataset_download_one_sequence.yaml
+#
+# Source downloader:
+#   https://github.com/ori-drs/oxford_spires_dataset/blob/main/scripts/dataset_download.py
+#
+# Keep unpack/check disabled because this is intentionally a partial one-sequence
+# subset, and Lingbot's upstream preprocess/oxford.py reads raw/images.zip directly.
+
+repo_id: "ori-drs/oxford_spires_dataset"
+repo_type: "dataset"
+branch: "main"
+
+local_dir: "/home/3dsm/Desktop/JSWprobe/oxford_spires_minimal/downloads"
+download: true
+unpack: false
+check: false
+
+patterns:
+  # Camera calibration for cam0 and cam0-LiDAR extrinsics.
+  - "calibration/cam0.yaml"
+  - "calibration/cam-lidar-imu.yaml"
+
+  # One sequence only. Lingbot preprocess reads only cam0/*.jpg from this zip.
+  - "sequences/2024-03-12-keble-college-02/raw/images.zip"
+
+  # GT trajectory and timestamp-bearing SLAM pose file.
+  - "sequences/2024-03-12-keble-college-02/processed/trajectory/gt-tum.txt"
+  - "sequences/2024-03-12-keble-college-02/processed/vilens-slam/slam-poses.csv"
+
+  # Mobile LiDAR data useful for depth generation or image-LiDAR sync checks.
+  - "sequences/2024-03-12-keble-college-02/processed/vilens-slam/undist-clouds.zip"
+
+  # TLS map used by upstream Lingbot preprocess for depth and visible GT cloud.
+  - "ground_truth_map/keble-college/merged-cloud-1cm.pcd"
+

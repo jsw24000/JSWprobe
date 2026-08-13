@@ -1,0 +1,8 @@
+calibration/cam0.yaml
+calibration/cam-lidar-imu.yaml
+sequences/2024-03-12-keble-college-02/raw/images.zip
+sequences/2024-03-12-keble-college-02/processed/trajectory/gt-tum.txt
+sequences/2024-03-12-keble-college-02/processed/vilens-slam/slam-poses.csv
+sequences/2024-03-12-keble-college-02/processed/vilens-slam/undist-clouds.zip
+ground_truth_map/keble-college/merged-cloud-1cm.pcd
+

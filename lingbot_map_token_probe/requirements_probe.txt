@@ -1,0 +1,8 @@
+# Use the same Python environment as Lingbot-map when possible.
+# The model itself needs torch/torchvision installed according to Lingbot-map's README.
+numpy
+Pillow
+PyYAML
+opencv-python
+tqdm
+matplotlib

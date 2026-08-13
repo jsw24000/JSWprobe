@@ -1,0 +1,14 @@
+experiment_name: "exp02_order_sensitivity"
+status: "interface"
+model: "lingbot-map"
+sequence_id: null
+geometry_source: null
+token_bundle: null
+conditions: []
+analysis_methods:
+  - "pca"
+  - "gram"
+  - "rsa"
+  - "cka"
+  - "token_displacement"
+notes: "Define same-frame/different-order conditions before running."

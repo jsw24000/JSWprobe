@@ -1,0 +1,56 @@
+inherits: full_5968_direct_kf5.yaml
+run_name: full_5968_direct_kf5_online_interactions
+
+# Replays the complete kf5 stream to compute interaction summaries online.
+# Raw Q/K/V is saved only for the four Level 3 debug frames/layers below.
+reconstruction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/full_5968_direct_kf5/interaction_replay_online
+interaction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/full_5968_direct_kf5/interaction
+analysis_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/full_5968_direct_kf5/analysis/loop_3403_4414
+
+dataset:
+  start_frame: 0
+  end_frame: 5968
+  input_stride: 1
+
+start_frame: 0
+end_frame: 5968
+stride: 1
+
+save_qkv_for_selected_frames: true
+
+interaction:
+  online_aggregation: true
+  write_level1_global_summary: true
+  write_level2_loop_dense: true
+  write_level3_raw_qkv_debug: true
+
+outputs:
+  save_pose_all_frames: true
+  save_depth_all_frames: false
+  save_world_points_all_frames: false
+  save_depth_stride: 0
+  save_world_points_stride: 0
+  save_keyframe_schedule: true
+  save_memory_state_summary: true
+  save_dense_outputs: false
+
+extraction:
+  enabled: true
+  global_summary_stride: 10
+  loop_current_range: [4380, 4445]
+  loop_current_stride: 1
+  target_history_range: [3370, 3440]
+  representative_layers: [4, 11, 17, 23]
+  selected_current_frames: [4400, 4414, 4430]
+  auto_control_frames: 1
+  raw_qkv_frames: [2755, 4400, 4414, 4430]
+  raw_qkv_max_frames: 4
+  raw_qkv_storage_dtype: float16
+  raw_qkv_budget_gb: 8
+  global_output_budget_gb: 30
+  hard_output_budget_gb: 40
+  top_k_history_frames: 32
+  age_histogram_bins: 32
+  flush_every_records: 1
+
+status: prepared_online_interaction_replay_do_not_overwrite_formal_reconstruction

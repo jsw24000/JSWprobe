@@ -1,0 +1,104 @@
+experiment_name: controlled_16_staircase_exp_v4
+scene_id: scene0002
+target_frame_id: 600
+sequence_total_length: 16
+prefix_length: 15
+token_type: image_tokens
+extract_last_frame_only: true
+layers: [4, 11, 17, 23]
+
+# Copied directly from controlled_16_exp_v3. Do not reselect frames here.
+reference_sequences: &controlled_16_staircase_exp_v4_reference_sequences
+  X:
+    frame_ids: [600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600]
+    role: repeated_target_X_no_external_prefix
+  C:
+    frame_ids: [920, 926, 932, 938, 944, 950, 956, 962, 968, 974, 980, 986, 992, 998, 1004, 600]
+    role: very_low_overlap_unrelated_no_floor
+  B1_local_relevant:
+    frame_ids: [510, 516, 522, 528, 534, 540, 546, 552, 558, 564, 570, 576, 582, 588, 594, 600]
+    role: local_relevant
+
+project:
+  name: controlled_16_staircase_exp_v4
+  output_root: outputs
+  random_seed: 2026
+  path_mode: absolute
+
+data:
+  dataset_name: scannet
+  scannet_root: from_data_scannet_config
+  env_var: SCANNET_RAW_ROOT
+  scene_ids:
+    - scene0002_00
+  max_scenes: 1
+  require_color: true
+  require_depth: true
+  require_pose: true
+  require_intrinsic: true
+
+sequence:
+  seq_lens: [16]
+  settings:
+    controlled_16_staircase:
+      enabled: true
+      experiment_name: controlled_16_staircase_exp_v4
+      scene_id: scene0002
+      target_frame_id: 600
+      sequence_total_length: 16
+      prefix_length: 15
+      token_type: image_tokens
+      extract_last_frame_only: true
+      layers: [4, 11, 17, 23]
+      reference_v3_project: controlled_16_exp_v3
+      reference_v3_setting: prefix_induced_modulation
+      relevant_sequence_name: B1_local_relevant
+      unrelated_sequence_name: C
+      x_sequence_name: X
+      replacement_order: suffix
+      reference_sequences: *controlled_16_staircase_exp_v4_reference_sequences
+
+    controlled_16_staircase_reverse:
+      enabled: true
+      experiment_name: controlled_16_staircase_exp_v4
+      scene_id: scene0002
+      target_frame_id: 600
+      sequence_total_length: 16
+      prefix_length: 15
+      token_type: image_tokens
+      extract_last_frame_only: true
+      layers: [4, 11, 17, 23]
+      reference_v3_project: controlled_16_exp_v3
+      reference_v3_setting: prefix_induced_modulation
+      relevant_sequence_name: B1_local_relevant
+      unrelated_sequence_name: C
+      x_sequence_name: X
+      replacement_order: prefix
+      reference_sequences: *controlled_16_staircase_exp_v4_reference_sequences
+
+extraction:
+  models:
+    - lingbot-map
+  python_executable: ${LINGBOT_PYTHON:-python}
+  device: cuda
+  save_tokens_dtype: float16
+  save_raw_attention: false
+  save_attention_summary: true
+  save_geometry_outputs: true
+  skip_existing: true
+  token_slice: patch
+  layers: [4, 11, 17, 23]
+  use_sdpa: true
+  num_scale_frames: 8
+  camera_num_iterations: 4
+  keyframe_interval: 1
+  kv_cache_sliding_window: 64
+  max_frame_num: 1024
+  image_size: 518
+  patch_size: 14
+
+smoke_test:
+  layers: [17]
+  sequences: [staircase_k00, staircase_k01, staircase_k15]
+  target_frame_id: 600
+  methods: [staircase_delta]

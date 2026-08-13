@@ -1,0 +1,7 @@
+project_root: ..
+dataset_root: ../memory_scene_blender/outputs/object_translation_v1
+dinov2_repo: ../dinov2
+dinov2_checkpoint: ../dinov2/weights/dinov2/dinov2_vitl14_reg4_pretrain.pth
+vggt_repo: ../vggt
+vggt_checkpoint: ../vggt/checkpoints/model.pt
+

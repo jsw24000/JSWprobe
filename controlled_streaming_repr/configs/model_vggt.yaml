@@ -1,0 +1,6 @@
+model_name: "vggt"
+repo_path: "../third_party/vggt"
+weights_path: "../third_party/vggt/checkpoints/model.pt"
+checkpoint_policy: "inside_original_repo"
+weights_ready: true
+notes: "Optional future non-streaming baseline; current executable token/reconstruction path focuses on Lingbot-map."

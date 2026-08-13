@@ -1,0 +1,40 @@
+dataset_name: "scannet"
+raw_data_policy: "external_data_disk"
+
+# Optional override for machines where the data disk is mounted elsewhere.
+env_var: "SCANNET_RAW_ROOT"
+
+# Candidate paths found from previous experiments.
+candidate_roots:
+  - "/home/data1/3dsm/ScanNet/scans_extracted"
+  - "/home/data1/3dsm/ScanNet"
+  - "/home/data1/ScanNet/scans"
+  - "/home/data1/ScanNet"
+  - "/home/data1"
+  - "/home/data1/3dsm/S2VGGT"
+  - "/disk1/3dsm/S2VGGT"
+  - "/disk1/scannet"
+  - "/data1"
+
+verified_raw_scans_root: "/home/data1/ScanNet/scans"
+
+default_scene: "scene0000_00"
+previous_experiment_scenes:
+  - "scene0000_00"
+  - "scene0002_00"
+  - "scene0006_00"
+  - "scene0010_00"
+  - "scene0015_00"
+  - "scene0016_00"
+  - "scene0024_00"
+  - "scene0030_00"
+
+expected_scene_files:
+  - "{scene}.sens"
+  - "{scene}.aggregation.json"
+  - "{scene}_2d-instance-filt.zip"
+
+notes: >
+  Raw ScanNet data is kept outside this project. The project data directory is
+  reserved for controlled manifests and derived data, not for copying the full
+  ScanNet dataset.

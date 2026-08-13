@@ -1,0 +1,120 @@
+project:
+  name: revisit_memory_memory_transplant
+  output_root: revisit_memory/outputs
+  run_id: memory_transplant_v1
+  random_seed: 1234
+
+paths:
+  lingbot_root: lingbot-map
+  model_path: lingbot-map/checkpoints/lingbot-map.pt
+  data_root: memory_scene_blender/outputs/lingbot_memory_basic_v1
+
+conditions:
+  - always_absent
+  - seen_then_removed
+
+frames:
+  total_frames: 96
+  anchor_frames: [0, 7]
+  first_loop_visible: [12, 39]
+  second_loop_eval: [56, 83]
+  expected_first_revisit_frame: 56
+  last_first_loop_visible: 39
+  smoke_save_frames: [12, 56]
+  smoke_prefix_end: 56
+  default_feature_ranges:
+    - [12, 39]
+    - [56, 83]
+  default_feature_stride: 4
+  default_feature_extra_frames: [23, 30, 39, 56, 67, 74, 83]
+
+model:
+  mode: streaming
+  image_size: 518
+  patch_size: 14
+  anchor_frame_count: 8
+  local_window_size: 16
+  keyframe_interval: 1
+  max_frame_num: 1024
+  enable_3d_rope: true
+  use_sdpa: true
+  camera_num_iterations: 4
+  offload_to_cpu: true
+  precision: auto
+
+features:
+  selected_layers: [4, 11, 17, 23]
+  save_dtype: float16
+  save_frame_block: true
+  save_global_block: true
+  save_memory_special_tokens: true
+  upsample_mode: bilinear
+  cosine_min_norm: 1.0e-6
+
+analysis:
+  confidence_threshold: 1.5
+  bbox_expansions: [0.0, 0.03]
+  depth_valid_min: 0.0
+  depth_valid_max: 50.0
+  eps: 1.0e-8
+  comparable_percentile: 99.0
+  pointcloud_max_points_per_frame: 50000
+  pointcloud_max_points_per_segment: 120000
+  pointcloud_save_ply: false
+  pointcloud_save_figures: true
+  pointcloud_metric_depth_scale: true
+  pointcloud_depth_scale_exclude_target_mask: true
+  pointcloud_plot_limits:
+    xy: [[-3.4, 3.4], [-3.4, 3.4]]
+    xz: [[-3.4, 3.4], [-0.1, 2.8]]
+  pointcloud_target_zoom_margin: 0.7
+  save_depth_figures: false
+  save_image_token_figures: true
+  depth_scale:
+    policy: shared_anchor_background
+    shared_anchor_background_frames: [0, 11]
+    exclude_target_mask: true
+    min_unmasked_pixels: 1024
+    max_samples: 5000000
+    pair_background_alignment: true
+    pair_background_reference_condition: always_absent
+    pair_background_source_condition: seen_then_removed
+  image_token_patch_samples_per_frame: 256
+  memory_token_sample_frames: [0, 7, 12, 23, 30, 39, 40, 55, 56, 67, 74, 83, 95]
+
+transplant:
+  baseline_run_id: full_shared_scale_v1
+  target_frames: [68, 72, 74, 76, 80, 83]
+  query_conditions:
+    A: always_absent
+    R: seen_then_removed
+  variants: [AA, RR, AR, RA, AS, AN]
+  include_negative_control: true
+  save_full_cache_snapshots: false
+  save_snapshot_manifests: true
+  source_visibility_condition: seen_then_removed
+  target_mask_min_pixels: 1
+  max_report_heatmap_frames: [68, 72, 74, 76, 80, 83]
+
+exports:
+  save_model_input_images: false
+  reconstruction_pointclouds:
+    enabled: false
+    max_points_per_file: 120000
+    confidence_threshold: null
+    depth_sources: [pred_depth_metric_scaled]
+    camera_sources: [gt_camera]
+    segments: [second_loop_eval]
+
+validation:
+  rgb_mean_abs_threshold: 0.01
+  rgb_max_abs_threshold: 5.0
+  depth_mean_abs_threshold: 1.0e-5
+  depth_max_abs_threshold: 1.0e-4
+  pose_abs_threshold: 1.0e-8
+  intrinsic_abs_threshold: 1.0e-8
+  feature_equal_mean_abs_threshold: 1.0e-4
+  feature_equal_max_abs_threshold: 5.0e-3
+  feature_close_mean_relative_l2_threshold: 1.0e-2
+  feature_close_max_relative_l2_threshold: 1.0e-1
+  feature_equivalence_hard_fail_on_max_relative_l2: false

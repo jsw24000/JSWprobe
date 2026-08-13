@@ -1,0 +1,21 @@
+model_name: "lingbot-map"
+repo_path: "../third_party/lingbot-map"
+checkpoint_path: "../third_party/lingbot-map/checkpoints/lingbot-map.pt"
+checkpoint_policy: "inside_original_repo"
+token_output_root: "../outputs/tokens"
+official_defaults:
+  image_size: 518
+  patch_size: 14
+  num_scale_frames: 8
+  camera_num_iterations: 4
+  keyframe_interval: 1
+  kv_cache_sliding_window: 64
+  max_frame_num: 1024
+  use_sdpa: true
+  default_layers:
+    - 4
+    - 11
+    - 17
+    - 23
+use_d1_stage0_as_visual_reference: true
+notes: "Use the official Lingbot-map demo path for reconstruction and intermediate token extraction."

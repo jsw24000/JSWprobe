@@ -1,0 +1,80 @@
+project:
+  name: geometry_tokens_scannet
+  output_root: outputs
+  random_seed: 2026
+
+paths:
+  controlled_root: ../controlled_streaming_repr
+  scannet_root: ${SCANNET_RAW_ROOT:-/home/data1/3dsm/ScanNet/scans_extracted}
+  manifest_path: null
+  token_dir: null
+  pca_figures_dir: null
+  pca_metrics_path: null
+
+controlled:
+  experiment_name: controlled_128_exp_v1
+  model_name: lingbot-map
+  scene_id: scene0002_00
+  setting_name: order_perturbation
+  condition_id: order_normal_seq128_seg000
+
+tokens:
+  preferred_layer: layer_11
+  token_type: patch_tokens
+  patch_grid: null
+
+frames:
+  max_frames: null
+  require_rgb: true
+  require_depth: true
+
+depth:
+  depth_scale: 1000.0
+  valid_min_m: 0.05
+  valid_max_m: 20.0
+  valid_patch_ratio_min: 0.2
+  residual: absolute
+  per_frame_normalization: percentile
+  percentile_low: 5.0
+  percentile_high: 95.0
+
+cues:
+  include_rgb_gradient: true
+  coordinate_range: zero_one
+
+ridge:
+  use_sklearn_if_available: true
+  alphas: [0.01, 0.1, 1.0, 10.0, 100.0]
+  cv_folds: 5
+  train_scope: sequence
+
+geometry_tokens:
+  top_percentiles: [5, 10, 20]
+  default_top_percentile: 10
+
+pca_noise:
+  layer: layer_17
+  existing_mask_globs:
+    - "*noise*mask*.npy"
+    - "*outlier*mask*.npy"
+    - "*pca*mask*.npy"
+  score_percentile: 90.0
+  min_score: 0.45
+  local_window_radius: 1
+  small_component_max_area: 4
+  keep_large_components: false
+  fallback_min_patches: 3
+  black_value_threshold: 0.08
+  saturation_threshold: 0.82
+  weights:
+    local_color_anomaly: 1.0
+    black_patch: 0.35
+    high_saturation: 0.25
+    isolated_component: 0.35
+
+visualization:
+  max_panel_width: 360
+  heatmap_cmap: magma
+  geometry_color: [255, 64, 64]
+  pca_noise_color: [0, 190, 255]
+  overlap_color: [255, 220, 40]

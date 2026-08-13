@@ -1,0 +1,30 @@
+lingbot_root: ../lingbot-map
+model_path: ../lingbot-map/checkpoints/lingbot-map.pt
+
+# The user's disk1 paths are aliased by the scripts to /home/data1 on this host.
+# Priority is S2VGGT first, then the older ScanNet root.
+data_roots:
+  - /disk1/3dsm/S2VGGT
+  - /home/data1/3dsm/S2VGGT
+  - /disk1/scannet
+  - /home/data1/ScanNet
+  - /data1
+
+default_scene: scene0000_00
+num_frames: 12
+frame_stride: 10
+
+model:
+  image_size: 518
+  patch_size: 14
+  selected_idx: [4, 11, 17, 23]
+  num_scale_frames: 8
+  use_sdpa: true
+
+visualization:
+  fit_scope: scene
+  normalization: l2
+  controls: true
+  correspondence_stage: auto
+  correspondence_src_frame: 0
+  correspondence_tgt_frame: 5

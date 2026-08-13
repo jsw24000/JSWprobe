@@ -1,0 +1,3 @@
+train_on_primitive_translations_only: true
+evaluate_real_rendered_composite_states: true
+

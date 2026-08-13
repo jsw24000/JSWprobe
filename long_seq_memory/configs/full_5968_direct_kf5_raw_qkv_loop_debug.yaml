@@ -1,0 +1,52 @@
+inherits: full_5968_direct_kf5.yaml
+run_name: full_5968_direct_kf5_raw_qkv_loop_debug
+
+# This replay reproduces the kf5 long-memory state up to the loop event and
+# captures raw visible-memory Q/K/V only for a few frames/layers. It does not
+# overwrite the completed formal reconstruction.
+reconstruction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/full_5968_direct_kf5/interaction_capture_raw_qkv_0_4431
+interaction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/full_5968_direct_kf5/interaction
+analysis_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/full_5968_direct_kf5/analysis/loop_3403_4414_raw_qkv_debug
+
+dataset:
+  start_frame: 0
+  end_frame: 4431
+  input_stride: 1
+
+start_frame: 0
+end_frame: 4431
+stride: 1
+
+save_qkv_for_selected_frames: true
+selected_frames: [1689, 4400, 4414, 4430]
+selected_layers: [4, 11, 17, 23]
+
+outputs:
+  save_pose_all_frames: true
+  save_depth_all_frames: false
+  save_world_points_all_frames: false
+  save_depth_stride: 0
+  save_world_points_stride: 0
+  save_keyframe_schedule: true
+  save_memory_state_summary: true
+  save_dense_outputs: false
+
+extraction:
+  enabled: true
+  global_summary_stride: 10
+  loop_current_range: [4380, 4445]
+  loop_current_stride: 1
+  target_history_range: [3370, 3440]
+  representative_layers: [4, 11, 17, 23]
+  selected_current_frames: [4390, 4400, 4408, 4414, 4420, 4430]
+  raw_qkv_frames: [1689, 4400, 4414, 4430]
+  raw_qkv_max_frames: 4
+  raw_qkv_storage_dtype: float16
+  raw_qkv_budget_gb: 8
+  global_output_budget_gb: 30
+  hard_output_budget_gb: 40
+  top_k_history_frames: 32
+  age_histogram_bins: 32
+  flush_every_records: 64
+
+status: prepared_loop_raw_qkv_debug_replay

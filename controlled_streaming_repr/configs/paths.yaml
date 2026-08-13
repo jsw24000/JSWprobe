@@ -1,0 +1,8 @@
+# Relative paths are resolved from this configs directory.
+project_root: "../"
+lingbot_repo: "../third_party/lingbot-map"
+vggt_repo: "../third_party/vggt"
+outputs_dir: "../outputs"
+data_dir: "../data"
+raw_scannet_scans: "/home/data1/ScanNet/scans"
+raw_data_env_var: "SCANNET_RAW_ROOT"

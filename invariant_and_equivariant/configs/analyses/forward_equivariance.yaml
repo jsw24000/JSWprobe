@@ -1,0 +1,3 @@
+probe: ridge_forward_map
+feature_spaces: [raw_standardized, l2_normalized]
+

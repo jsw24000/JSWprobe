@@ -1,0 +1,108 @@
+run:
+  tag: ropeoff_32f
+  seed: 42
+  device: cuda
+  output_root: outputs
+  use_cache: true
+  save_query_matches: true
+  max_saved_queries_per_pair_backend: 512
+
+paths:
+  scannet_root: /home/data1/3dsm/ScanNet/scans_extracted
+  scene_id: scene0002_00
+  lingbot_repo: /home/3dsm/Desktop/JSWprobe/lingbot-map
+  lingbot_checkpoint: /home/3dsm/Desktop/JSWprobe/lingbot-map/checkpoints/lingbot-map.pt
+  dinov2_repo: /home/3dsm/Desktop/JSWprobe/dinov2
+  dinov2_checkpoint: /home/3dsm/Desktop/JSWprobe/weights/dinov2/dinov2_vitl14_reg4_pretrain.pth
+
+data:
+  image_resize:
+    enabled: true
+    height: 392
+    width: 518
+
+frame_sampling:
+  start_frame: 0
+  stride: 5
+  num_frames: 32
+  allow_skip_missing: true
+
+feature_backends:
+  enabled:
+    - public_dinov2_vitl14
+    - lingbot_backbone_pre_agg_rope_off
+    - lingbot_single_frame_recon_rope_off
+    - lingbot_offline_global_32f_rope_off
+
+lingbot:
+  disable_video_rope: true
+  require_rope_disabled_verification: true
+  batch_size: 4
+  extract_stages:
+    single_frame_recon: ["stage0", "stage1", "stage2", "stage3"]
+    offline_global_32f: ["stage0", "stage1", "stage2", "stage3"]
+  token_type: image
+  exclude_special_tokens: true
+
+dinov2:
+  model_name: dinov2_vitl14_reg
+  use_register_model: true
+  batch_size: 4
+  patch_size: 14
+  feature_key: x_norm_patchtokens
+  imagenet_normalization: true
+
+pairs:
+  pairs_per_bucket: 12
+  min_overlap_ratio: 0.05
+  min_valid_correspondences: 200
+  buckets:
+    small:
+      min_translation_m: 0.05
+      max_translation_m: 0.30
+      max_rotation_deg: 15
+    medium:
+      min_translation_m: 0.30
+      max_translation_m: 0.80
+      max_rotation_deg: 45
+    large:
+      min_translation_m: 0.80
+      max_translation_m: 2.00
+      max_rotation_deg: 90
+
+geometry:
+  depth_scale: 1000.0
+  depth_abs_tol_m: 0.05
+  depth_rel_tol: 0.05
+  pose_convention: camera_to_world
+  depth_color_alignment_assumption: aligned_or_intrinsic_mapping
+
+queries:
+  queries_per_pair: 512
+  sampling: uniform_valid_tokens
+  share_queries_across_backends: true
+
+matching:
+  l2_normalize: true
+  match_only_valid_target_depth: true
+  methods:
+    - random
+    - same_coord
+    - feature_nn
+  optional_methods:
+    mutual_nn: false
+    ratio_test: false
+
+metrics:
+  pixel_thresholds: [4, 8, 10, 16, 32, 64]
+  token_thresholds: [1, 2, 4]
+  topk: [1, 5, 10]
+  metric_3d_thresholds_m: [0.05, 0.10, 0.20]
+
+visualization:
+  enabled: true
+  max_pairs_to_visualize: 12
+  num_lines_per_match_plot: 80
+  num_heatmap_queries_per_pair_backend: 4
+  correct_px_threshold: 16
+

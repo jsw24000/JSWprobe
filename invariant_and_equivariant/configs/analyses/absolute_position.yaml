@@ -1,0 +1,4 @@
+target_coordinate_systems: [ref, current, world]
+probe: ridge
+baseline: mask_bbox_camera_pose
+

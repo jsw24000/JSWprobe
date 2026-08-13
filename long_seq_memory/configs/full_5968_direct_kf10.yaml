@@ -1,0 +1,13 @@
+inherits: full_5968_direct_kf5.yaml
+run_name: full_5968_direct_kf10
+reconstruction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/full_5968_direct_kf10/reconstruction
+interaction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/full_5968_direct_kf10/interaction
+analysis_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/full_5968_direct_kf10/analysis/loop_3403_4414
+
+inference:
+  keyframe_interval: 10
+
+model_defaults:
+  keyframe_interval: 10
+
+status: prepared_resource_fallback_do_not_auto_run_5968

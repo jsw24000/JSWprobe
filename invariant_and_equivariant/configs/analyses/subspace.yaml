@@ -1,0 +1,3 @@
+default_rank: 2
+effective_rank_threshold: 0.05
+

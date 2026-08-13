@@ -1,0 +1,31 @@
+experiment_name: controlled_16_staircase_exp_v4
+status: implemented
+model: lingbot-map
+experiment_config: configs/controlled_16_staircase_exp_v4.yaml
+analysis_config: configs/analysis_controlled_16_staircase_exp_v4.yaml
+reverse_experiment_config: configs/controlled_16_staircase_exp_v4_with_reverse.yaml
+reverse_analysis_config: configs/analysis_controlled_16_staircase_reverse_exp_v4.yaml
+reconstruction_config: configs/reconstruction_controlled_16_staircase_exp_v4.yaml
+sequence_setting: controlled_16_staircase
+reverse_sequence_setting: controlled_16_staircase_reverse
+conditions:
+  - staircase_k00
+  - staircase_k01
+  - staircase_k02
+  - staircase_k03
+  - staircase_k04
+  - staircase_k05
+  - staircase_k06
+  - staircase_k07
+  - staircase_k08
+  - staircase_k09
+  - staircase_k10
+  - staircase_k11
+  - staircase_k12
+  - staircase_k13
+  - staircase_k14
+  - staircase_k15
+analysis_methods:
+  - staircase_delta
+notes: Staircase replacement of v3 C suffix with v3 B1 suffix, fixed target 0600.
+reverse_notes: Reverse staircase replacement of v3 C prefix with v3 B1 prefix, fixed target 0600.

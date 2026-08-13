@@ -1,0 +1,139 @@
+{
+  "dataset_name": "object_translation_v1",
+  "schema_version": 1,
+  "seed": 20260804,
+  "output_root": "memory_scene_blender/outputs/object_translation_v1",
+  "render": {
+    "engine": "BLENDER_EEVEE",
+    "resolution": [512, 512],
+    "samples": 32,
+    "color_mode": "RGB",
+    "depth_format": "OPEN_EXR",
+    "normal_format": "PNG",
+    "albedo_enabled": true,
+    "world_intensity": 0.65,
+    "skip_existing": true
+  },
+  "modes": {
+    "smoke": {
+      "scene_count": 1,
+      "grid_rows": 2,
+      "grid_cols": 2,
+      "camera_count": 4,
+      "primary_camera_count": 3,
+      "resolution": [192, 192],
+      "samples": 4,
+      "min_visible_cameras": 2,
+      "min_mask_area_ratio": 0.006
+    },
+    "full": {
+      "scene_count": 12,
+      "grid_rows": 4,
+      "grid_cols": 4,
+      "camera_count": 12,
+      "primary_camera_count": 8,
+      "resolution": [512, 512],
+      "samples": 32,
+      "min_visible_cameras": 8,
+      "min_mask_area_ratio": 0.02
+    }
+  },
+  "camera": {
+    "reference_camera_id": "camera_000",
+    "fov_degrees": 60.0,
+    "sensor_width_mm": 36.0,
+    "clip_start": 0.05,
+    "clip_end": 50.0,
+    "arc_degrees": [-105.0, 18.0],
+    "radius_m": 3.85,
+    "height_levels_m": [1.25, 1.65],
+    "look_at": [0.25, -0.15, 0.62],
+    "reserved_camera_suffix_start": 8
+  },
+  "positions": {
+    "grid_spacing_min_m": 0.38,
+    "grid_spacing_max_m": 0.58,
+    "global_jitter_m": 0.035,
+    "wall_margin_m": 0.45,
+    "static_clearance_m": 0.14,
+    "target_clearance_m": 0.08,
+    "preferred_center": [0.35, -0.35]
+  },
+  "visibility": {
+    "edge_margin_px": 3,
+    "max_bbox_edge_touch_ratio": 0.45,
+    "min_mask_area_ratio": 0.02,
+    "min_visible_cameras": 8
+  },
+  "scene": {
+    "target_categories": ["chair", "armchair", "side_table", "small_cabinet"],
+    "target_variants_per_category": 3,
+    "room_layouts": [
+      {
+        "layout_id": "corner_open_compact",
+        "dimensions": [5.6, 5.0, 2.7],
+        "wall_mode": "north_west",
+        "grid_center": [0.35, -0.45],
+        "static_layout_id": 0,
+        "floor_material": "floor_warm_oak",
+        "wall_material": "wall_soft_gray",
+        "lighting_preset": "neutral_daylight"
+      },
+      {
+        "layout_id": "corner_open_wide",
+        "dimensions": [6.2, 5.4, 2.8],
+        "wall_mode": "north_west",
+        "grid_center": [0.55, -0.35],
+        "static_layout_id": 1,
+        "floor_material": "floor_desaturated_wood",
+        "wall_material": "wall_warm_white",
+        "lighting_preset": "warm_indoor"
+      },
+      {
+        "layout_id": "corner_open_deep",
+        "dimensions": [5.8, 5.9, 2.9],
+        "wall_mode": "north_west",
+        "grid_center": [0.40, -0.25],
+        "static_layout_id": 2,
+        "floor_material": "floor_cool_concrete",
+        "wall_material": "wall_cool_gray",
+        "lighting_preset": "cool_indoor"
+      }
+    ],
+    "lighting_presets": {
+      "neutral_daylight": {
+        "world_color": [0.78, 0.80, 0.82],
+        "key_location": [-0.8, -1.0, 3.2],
+        "key_energy": 420.0,
+        "key_size": 4.8,
+        "fill_location": [2.1, -2.2, 2.0],
+        "fill_energy": 55.0,
+        "fill_size": 3.0
+      },
+      "warm_indoor": {
+        "world_color": [0.74, 0.70, 0.64],
+        "key_location": [-1.1, -0.8, 3.1],
+        "key_energy": 380.0,
+        "key_size": 5.2,
+        "fill_location": [2.3, -2.0, 2.1],
+        "fill_energy": 70.0,
+        "fill_size": 3.2
+      },
+      "cool_indoor": {
+        "world_color": [0.68, 0.72, 0.76],
+        "key_location": [-0.7, -1.4, 3.35],
+        "key_energy": 400.0,
+        "key_size": 5.0,
+        "fill_location": [2.0, -2.4, 2.0],
+        "fill_energy": 48.0,
+        "fill_size": 3.4
+      }
+    }
+  },
+  "splits": {
+    "train_scene_count": 8,
+    "val_scene_count": 2,
+    "test_scene_count": 2,
+    "held_out_target_instance_mod": 2
+  }
+}

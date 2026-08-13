@@ -1,0 +1,3 @@
+# No extra packages were installed for smoke_v1.
+# The pipeline ran in the existing conda environment named "vggt".
+# Required packages already present there: torch, torchvision, numpy, Pillow, PyYAML, scikit-learn, matplotlib, einops.

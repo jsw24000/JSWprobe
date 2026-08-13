@@ -1,0 +1,56 @@
+project_root: /home/3dsm/Desktop/JSWprobe
+experiment_root: /home/3dsm/Desktop/JSWprobe/long_seq_memory
+lingbot_root: /home/3dsm/Desktop/JSWprobe/lingbot-map
+dataset_root: /home/3dsm/Desktop/JSWprobe/oxford_spires_minimal/lingbot_ready_loop/keble-college-02
+output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs
+
+conda_env: lingbot-map
+checkpoint: /home/3dsm/Desktop/JSWprobe/lingbot-map/checkpoints/lingbot-map.pt
+
+sequence:
+  name: keble-college-02
+  source_sequence: 2024-03-12-keble-college-02
+  camera: cam0
+  expected_frames: 5968
+  index_base: 0
+
+loop_event:
+  history_frame: 3403
+  current_frame: 4414
+  expected_center_distance_m: 0.11899151834124974
+  expected_time_gap_s: 50.799432
+  history_segment: [3370, 3440]
+  current_segment: [4380, 4445]
+  selected_current_frames: [3403, 4400, 4405, 4410, 4414, 4418, 4425, 4435]
+
+validation:
+  output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/dataset_validation
+  center_distance_tolerance_m: 0.02
+  max_rotation_orthonormal_error: 0.001
+  max_rotation_det_error: 0.001
+
+model_defaults:
+  mode: streaming
+  device: cuda
+  dtype: auto
+  seed: 0
+  image_size: 518
+  patch_size: 14
+  enable_3d_rope: true
+  max_frame_num: 7000
+  num_scale_frames: 8
+  kv_cache_sliding_window: 64
+  kv_cache_scale_frames: 8
+  keyframe_interval: 1
+  use_sdpa: false
+  camera_num_iterations: 4
+  offload_to_cpu: true
+
+memory_policy:
+  token_layout_source: lingbot_map.aggregator.stream.AggregatorStream
+  num_register_tokens: 4
+  has_camera_token: true
+  has_scale_token: true
+  patch_start_idx: 6
+  flashinfer_special_stream_append_only: true
+  aggregator_keyframe_skip_append_effective: false

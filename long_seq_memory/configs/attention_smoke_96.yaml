@@ -1,0 +1,24 @@
+inherits: dataset_keble02.yaml
+run_name: attention_smoke_96
+output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/reconstruction/attention_smoke_96
+
+start_frame: 0
+end_frame: 100
+stride: 1
+
+device: cuda
+dtype: auto
+checkpoint: /home/3dsm/Desktop/JSWprobe/lingbot-map/checkpoints/lingbot-map.pt
+seed: 0
+
+model_defaults:
+  use_sdpa: true
+
+save_predicted_poses: true
+save_camera_tokens: true
+save_register_tokens: true
+save_image_token_summaries: true
+save_dense_outputs: false
+save_qkv_for_selected_frames: true
+selected_frames: [96]
+selected_layers: [23]

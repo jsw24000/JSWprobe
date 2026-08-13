@@ -1,0 +1,80 @@
+# Python caches and local tooling
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Virtual environments and package/build artifacts
+.venv/
+.venv-*/
+.venv-blenderproc/
+env/
+venv/
+ENV/
+build/
+dist/
+site/
+*.o
+*.a
+*.ninja_*
+
+# Experiment outputs, logs, and generated runs
+**/outputs/
+**/output/
+**/runs/
+**/wandb/
+**/safe_run/
+safe_run_logs/
+**/logs/
+*.log
+
+# Model weights, checkpoints, and large model artifacts
+**/checkpoints/
+**/checkpoint/
+**/ckpt/
+**/weights/
+**/models/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.onnx
+*.engine
+*.pb
+
+# Downloaded data and local caches
+**/.cache/
+**/cache/
+**/downloads/
+.hf_cache/
+.hf_xet/
+controlled_streaming_repr/data/controlled_sequences/
+oxford_spires_minimal/downloads/
+
+# Generated numeric/geometric/video artifacts
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.ply
+*.pcd
+*.mp4
+*.avi
+*.mov
+*.gif
+*.glb
+*.gltf
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

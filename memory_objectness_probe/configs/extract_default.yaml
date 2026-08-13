@@ -1,0 +1,19 @@
+data_root: ../memory_scene_blender/outputs/memory_write_probe_v1
+lingbot_root: ../lingbot-map
+checkpoint: ../lingbot-map/checkpoints/lingbot-map.pt
+output_root: outputs
+image_size: 518
+patch_size: 14
+num_scale_frames: 8
+keyframe_interval: 1
+kv_cache_sliding_window: 64
+camera_num_iterations: 4
+use_sdpa: true
+save_reconstruction: minimal
+probe_frame_source: metadata
+flush_frames: 0
+extract_layers:
+  - 4
+  - 11
+  - 17
+  - 23

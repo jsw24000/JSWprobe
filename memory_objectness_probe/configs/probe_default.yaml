@@ -1,0 +1,15 @@
+feature_manifest: outputs/features/feature_manifest.jsonl
+split_file: outputs/splits/scene_split_seed0.json
+task: state5
+layer: block17
+feature_mode: all6_mean
+model: linear
+pca_dim: none
+batch_size: 32
+lr: 0.001
+weight_decay: 0.001
+max_epochs: 200
+early_stop_patience: 20
+hidden_dim: 256
+dropout: 0.1
+seed: 0

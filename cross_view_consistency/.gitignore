@@ -1,0 +1,32 @@
+# Generated experiment outputs
+outputs/
+safe_run/
+safe_run_logs/
+log/
+logs/
+*.log
+*.jsonl
+
+# External model weights and checkpoints
+checkpoints/
+weights/
+models/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.bin
+*.safetensors
+
+# Python caches and bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Editor and OS files
+.DS_Store
+.vscode/

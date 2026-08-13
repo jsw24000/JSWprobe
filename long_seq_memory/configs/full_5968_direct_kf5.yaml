@@ -1,0 +1,94 @@
+inherits: dataset_keble02.yaml
+run_name: full_5968_direct_kf5
+output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs
+reconstruction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/full_5968_direct_kf5/reconstruction
+interaction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/full_5968_direct_kf5/interaction
+analysis_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/full_5968_direct_kf5/analysis/loop_3403_4414
+
+dataset:
+  start_frame: 0
+  end_frame: 5968
+  input_stride: 1
+
+inference:
+  mode: streaming
+  num_scale_frames: 8
+  kv_cache_sliding_window: 64
+  kv_cache_scale_frames: 8
+  keyframe_interval: 5
+  reset_state: false
+  image_size: 518
+  dtype: bfloat16
+  device: cuda
+  offload_predictions_to_cpu: true
+  use_sdpa: true
+  max_frame_num: 7000
+  enforce_keyframe_skip_append: true
+
+# Legacy fields are kept for older scripts that have not yet switched to the
+# nested dataset/inference blocks.
+start_frame: 0
+end_frame: 5968
+stride: 1
+device: cuda
+dtype: bfloat16
+checkpoint: /home/3dsm/Desktop/JSWprobe/lingbot-map/checkpoints/lingbot-map.pt
+seed: 0
+
+model_defaults:
+  use_sdpa: true
+  dtype: bfloat16
+  device: cuda
+  image_size: 518
+  max_frame_num: 7000
+  num_scale_frames: 8
+  kv_cache_sliding_window: 64
+  kv_cache_scale_frames: 8
+  keyframe_interval: 5
+  offload_to_cpu: true
+
+outputs:
+  save_pose_all_frames: true
+  save_depth_all_frames: false
+  save_world_points_all_frames: false
+  save_depth_stride: 10
+  save_world_points_stride: 20
+  save_keyframe_schedule: true
+  save_memory_state_summary: true
+  save_dense_outputs: false
+
+extraction:
+  enabled: false
+  global_summary_stride: 10
+  loop_current_range: [4380, 4445]
+  loop_current_stride: 1
+  target_history_range: [3370, 3440]
+  representative_layers: [4, 11, 17, 23]
+  selected_current_frames: [4390, 4400, 4408, 4414, 4420, 4430]
+  raw_qkv_frames: [4400, 4414, 4430]
+  raw_qkv_max_frames: 4
+  raw_qkv_storage_dtype: float16
+  raw_qkv_budget_gb: 8
+  global_output_budget_gb: 30
+  hard_output_budget_gb: 40
+  top_k_history_frames: 32
+  age_histogram_bins: 32
+  flush_every_records: 64
+
+resource_estimation:
+  timing_reference_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/reconstruction/loop_3200_4600
+  output_budget_gb: 30
+  hard_output_budget_gb: 40
+
+resume:
+  enabled: false
+  reason: KV-state serialization is not implemented; resume is valid only from an explicit full KV checkpoint.
+
+path_audit:
+  requested_lingbot_root: /home/3dsm/Desktop/JSWprobe/Lingbot-map
+  actual_lingbot_root: /home/3dsm/Desktop/JSWprobe/lingbot-map
+  requested_dataset_root: /home/3dsm/Desktop/JSWprobe/oxford_spires_minimal/lingbot_ready/keble-college-02
+  actual_dataset_root: /home/3dsm/Desktop/JSWprobe/oxford_spires_minimal/lingbot_ready_loop/keble-college-02
+  note: Only the actual lowercase/loop-ready paths exist in this workspace.
+
+status: prepared_do_not_auto_run_5968

@@ -1,0 +1,78 @@
+project:
+  name: controlled_128_exp_v1
+  output_root: outputs
+  random_seed: 2026
+  path_mode: absolute
+data:
+  dataset_name: scannet
+  scannet_root: ${SCANNET_RAW_ROOT:-/home/data1/3dsm/ScanNet/scans_extracted}
+  scene_ids:
+  - scene0002_00
+  max_scenes: 10
+  require_color: true
+  require_depth: true
+  require_pose: true
+  require_intrinsic: true
+sequence:
+  seq_lens:
+  - 128
+  settings:
+    repeated_frame_stability:
+      enabled: false
+      num_anchors_per_scene: 1
+      anchor_strategy: uniform_valid
+      avoid_boundary_ratio: 0.1
+      require_valid_pose: true
+    two_state_alternation:
+      enabled: false
+      num_pairs_per_scene: 1
+      # Optional override for hand-picked overlap pairs. When non-empty, the
+      # automatic near/far selector is skipped for this setting.
+      manual_pairs:
+        - label: overlap_candidate
+          A_frame_id: "0000"
+          B_frame_id: "0060"
+          emit_pair_types: ["near"]
+      # manual_pairs: []
+      near_gap_candidates:
+      - 5
+      - 10
+      - 15
+      far_min_index_gap: 80
+      far_max_index_gap: null
+      prefer_pose_distance_for_far: true
+      far_min_translation: 0.8
+      if_pose_distance_unavailable: fallback_to_index_gap
+      require_valid_pose: true
+    order_perturbation:
+      enabled: true
+      num_segments_per_scene: 1
+      base_stride_candidates:
+      - 5
+      - 10
+      - 15
+      shuffle_seed: 2026
+      shuffle_mode: deterministic_interleave
+      require_valid_pose: true
+extraction:
+  models:
+  - lingbot-map
+  python_executable: ${LINGBOT_PYTHON:-/home/3dsm/miniconda3/envs/lingbot-map/bin/python}
+  device: cuda
+  save_tokens_dtype: float16
+  save_raw_attention: false
+  save_attention_summary: true
+  save_geometry_outputs: true
+  skip_existing: true
+  token_slice: patch
+  layers:
+  - 4
+  - 11
+  - 17
+  - 23
+  use_sdpa: true
+  num_scale_frames: 8
+  camera_num_iterations: 4
+  keyframe_interval: 1
+  kv_cache_sliding_window: 64
+  max_frame_num: 1024
