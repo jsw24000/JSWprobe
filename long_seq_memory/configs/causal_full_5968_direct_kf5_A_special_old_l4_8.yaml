@@ -1,0 +1,24 @@
+inherits: causal_full_5968_direct_kf5_baseline.yaml
+run_name: causal_full_5968_direct_kf5_A_special_old_l4_8
+
+reconstruction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_long_seq/A_special_old_l4_8/reconstruction
+interaction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_long_seq/A_special_old_l4_8/interaction
+analysis_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_long_seq/A_special_old_l4_8/analysis
+
+causal_intervention:
+  enabled: true
+  name: A_special_to_old_memory_l4_8
+  mode: special_to_old_memory
+  frames: [4414]
+  layers: [4, 5, 6, 7, 8]
+  num_special_tokens: 6
+  apply_when_old_memory_present: true
+
+representation_capture:
+  enabled: true
+  output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_long_seq/A_special_old_l4_8/reconstruction/representations
+  frames: [2755, 3403, 4380, 4400, 4414, 4430, 4445]
+  layers: all
+  storage_dtype: float16
+
+status: prepared_causal_A_do_not_auto_run

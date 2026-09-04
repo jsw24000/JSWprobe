@@ -1,0 +1,58 @@
+inherits: full_5968_direct_kf5_online_interactions.yaml
+run_name: causal_branch_4414_baseline
+
+reconstruction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_branch_4414/baseline/reconstruction
+interaction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_branch_4414/baseline/interaction
+analysis_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_branch_4414/baseline/analysis
+
+dataset:
+  start_frame: 0
+  end_frame: 4415
+  input_stride: 1
+
+start_frame: 0
+end_frame: 4415
+stride: 1
+
+causal_intervention:
+  enabled: false
+
+representation_capture:
+  enabled: true
+  output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_branch_4414/baseline/reconstruction/representations
+  frames: [3403, 4414]
+  layers: all
+  storage_dtype: float16
+
+outputs:
+  save_pose_all_frames: true
+  save_depth_all_frames: false
+  save_world_points_all_frames: false
+  save_depth_stride: 0
+  save_world_points_stride: 0
+  save_depth_frames: [3403, 4414]
+  save_world_points_frames: [3403, 4414]
+  save_keyframe_schedule: true
+  save_memory_state_summary: true
+  save_dense_outputs: false
+
+extraction:
+  enabled: true
+  global_summary_stride: 10
+  loop_current_range: [4414, 4414]
+  loop_current_stride: 1
+  target_history_range: [3370, 3440]
+  representative_layers: [4, 11, 17, 23]
+  selected_current_frames: [4414]
+  auto_control_frames: 0
+  raw_qkv_frames: [4414]
+  raw_qkv_max_frames: 1
+  raw_qkv_storage_dtype: float16
+  raw_qkv_budget_gb: 8
+  global_output_budget_gb: 30
+  hard_output_budget_gb: 40
+  top_k_history_frames: 32
+  age_histogram_bins: 32
+  flush_every_records: 1
+
+status: prepared_current_frame_branch_baseline_do_not_auto_run

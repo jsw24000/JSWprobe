@@ -50,3 +50,7 @@ decode_composition:
   primitive_tags: [horizontal, vertical, short-distance]
   composite_pair_types: [diagonal, two-step, medium-distance, random_valid_pair]
   eval_groups: [primitive_test, composite, diagonal, two_step, reverse, medium_distance, random_valid_pair, triplet]
+move_controls:
+  shuffle_repeats: 20
+  stability_repeats: 20
+  random_seed: 17

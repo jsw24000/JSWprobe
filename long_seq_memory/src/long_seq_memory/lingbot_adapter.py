@@ -118,10 +118,15 @@ def run_streaming_reconstruction(cfg: dict[str, Any]) -> dict[str, Any]:
 
     from long_seq_memory.interaction_hooks import (
         QKVHookStore,
+        RepresentationHookStore,
+        causal_intervention_from_config,
         install_flashinfer_attn_pre_hooks,
         install_flashinfer_memory_hooks,
+        install_block_output_hooks,
+        install_sdpa_causal_intervention_patch,
         install_sdpa_memory_hooks,
         install_sdpa_skip_append_patch,
+        representation_layers_from_config,
     )
 
     out_dir = ensure_dir(_reconstruction_output_dir(cfg))
@@ -172,8 +177,17 @@ def run_streaming_reconstruction(cfg: dict[str, Any]) -> dict[str, Any]:
     )
     removers = []
     sdpa_skip_patch_installed = False
+    causal_intervention = causal_intervention_from_config(cfg)
+    causal_intervention_installed = False
     enforce_skip_patch = bool(defaults.get("enforce_keyframe_skip_append", cfg.get("enforce_keyframe_skip_append", False)))
-    if bool(defaults.get("use_sdpa", False)) and (enforce_skip_patch or int(defaults.get("keyframe_interval", 1)) > 1):
+    if bool(defaults.get("use_sdpa", False)) and causal_intervention is not None:
+        _add_lingbot_to_path(cfg["lingbot_root"])
+        from lingbot_map.layers import attention
+
+        removers.append(install_sdpa_causal_intervention_patch(attention, causal_intervention))
+        sdpa_skip_patch_installed = True
+        causal_intervention_installed = True
+    elif bool(defaults.get("use_sdpa", False)) and (enforce_skip_patch or int(defaults.get("keyframe_interval", 1)) > 1):
         _add_lingbot_to_path(cfg["lingbot_root"])
         from lingbot_map.layers import attention
 
@@ -193,6 +207,31 @@ def run_streaming_reconstruction(cfg: dict[str, Any]) -> dict[str, Any]:
 
             removers.append(install_flashinfer_memory_hooks(flashinfer_cache, hook_store))
 
+    representation_cfg = cfg.get("representation_capture", {}) or {}
+    representation_store = None
+    if representation_cfg.get("enabled", False):
+        representation_frames = representation_cfg.get("frames")
+        if representation_frames is None:
+            loop_event = cfg.get("loop_event", {})
+            representation_frames = list(extraction.get("selected_current_frames", []))
+            representation_frames += list(extraction.get("raw_qkv_frames", []))
+            representation_frames += list(loop_event.get("selected_current_frames", []))
+            if "history_frame" in loop_event:
+                representation_frames.append(loop_event["history_frame"])
+            if "current_frame" in loop_event:
+                representation_frames.append(loop_event["current_frame"])
+        representation_frames_set = {int(frame_id) for frame_id in representation_frames}
+        num_layers = len(getattr(getattr(model, "aggregator", None), "global_blocks", []))
+        representation_layers = representation_layers_from_config(representation_cfg.get("layers", "all"), num_layers)
+        representation_store = RepresentationHookStore(
+            output_dir=Path(representation_cfg.get("output_dir", out_dir / "representations")).expanduser(),
+            selected_frames=representation_frames_set,
+            selected_layers=representation_layers,
+            storage_dtype=str(representation_cfg.get("storage_dtype", extraction.get("raw_qkv_storage_dtype", "float16"))),
+            num_special_tokens=int(cfg.get("memory_policy", {}).get("patch_start_idx", 6)),
+        )
+        removers.extend(install_block_output_hooks(model, representation_store))
+
     images = images.to(device)
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
@@ -204,22 +243,29 @@ def run_streaming_reconstruction(cfg: dict[str, Any]) -> dict[str, Any]:
 
     per_frame_time = []
     memory_rows = []
+    causal_intervention_rows = []
     pose_chunks = []
     dense_chunks: dict[str, list[Any]] = {}
     dense_frame_ids: dict[str, list[int]] = {}
     written_frames: list[int] = []
 
     outputs_cfg = cfg.get("outputs", {})
+    save_depth_frames = {int(v) for v in outputs_cfg.get("save_depth_frames", [])}
+    save_world_points_frames = {int(v) for v in outputs_cfg.get("save_world_points_frames", [])}
 
     def should_save_dense_key(key: str, frame_id: int) -> bool:
         if cfg.get("save_dense_outputs", False):
             return True
         if key.startswith("depth"):
+            if frame_id in save_depth_frames:
+                return True
             if outputs_cfg.get("save_depth_all_frames", False):
                 return True
             stride = int(outputs_cfg.get("save_depth_stride", 0) or 0)
             return stride > 0 and frame_id % stride == 0
         if key.startswith("world_points"):
+            if frame_id in save_world_points_frames:
+                return True
             if outputs_cfg.get("save_world_points_all_frames", False):
                 return True
             stride = int(outputs_cfg.get("save_world_points_stride", 0) or 0)
@@ -235,11 +281,32 @@ def run_streaming_reconstruction(cfg: dict[str, Any]) -> dict[str, Any]:
                     dense_chunks.setdefault(key, []).append(value[:, idx : idx + 1].detach().cpu())
                     dense_frame_ids.setdefault(key, []).append(frame_id)
 
+    def collect_causal_intervention_stats(output_frame_ids: list[int]) -> None:
+        if causal_intervention is None:
+            return
+        for layer_id, block in enumerate(getattr(getattr(model, "aggregator", None), "global_blocks", [])):
+            attn = getattr(block, "attn", None)
+            if attn is None:
+                continue
+            stats = getattr(attn, "_long_seq_last_intervention_stats", None)
+            if stats is None:
+                continue
+            if stats.get("active_frame") and (stats.get("active_layer") or stats.get("applied")):
+                item = dict(stats)
+                item["frame_ids"] = [int(frame_id) for frame_id in output_frame_ids]
+                item["source_frame_id"] = int(output_frame_ids[-1]) if output_frame_ids else None
+                causal_intervention_rows.append(item)
+            delattr(attn, "_long_seq_last_intervention_stats")
+
     model.clean_kv_cache()
     try:
         with torch.no_grad(), torch.amp.autocast(device_type=device.type, dtype=dtype, enabled=device.type == "cuda"):
             t0 = time.perf_counter()
             hook_store.current_frame_id = run_frames[0] if run_frames else None
+            if causal_intervention is not None:
+                causal_intervention.current_frame_id = None
+            if representation_store is not None:
+                representation_store.set_current_frame_ids(run_frames[:scale_frames])
             if interaction_writer is not None:
                 interaction_writer.set_current_memory_row(None)
             scale_output = model.forward(
@@ -248,6 +315,7 @@ def run_streaming_reconstruction(cfg: dict[str, Any]) -> dict[str, Any]:
                 num_frame_per_block=scale_frames,
                 causal_inference=True,
             )
+            collect_causal_intervention_stats(run_frames[:scale_frames])
             per_frame_time.extend([None] * scale_frames)
             pose_chunks.append(scale_output["pose_enc"].detach().cpu())
             stash_dense_outputs(scale_output, run_frames[:scale_frames])
@@ -307,6 +375,10 @@ def run_streaming_reconstruction(cfg: dict[str, Any]) -> dict[str, Any]:
                 if not is_keyframe:
                     model._set_skip_append(True)
                 hook_store.current_frame_id = frame_id
+                if causal_intervention is not None:
+                    causal_intervention.current_frame_id = frame_id
+                if representation_store is not None:
+                    representation_store.set_current_frame_ids([frame_id])
                 if interaction_writer is not None:
                     interaction_writer.set_current_memory_row(row)
                 start = time.perf_counter()
@@ -321,13 +393,14 @@ def run_streaming_reconstruction(cfg: dict[str, Any]) -> dict[str, Any]:
                     if not is_keyframe:
                         model._set_skip_append(False)
                 per_frame_time.append(time.perf_counter() - start)
+                collect_causal_intervention_stats([frame_id])
                 pose_chunks.append(frame_output["pose_enc"].detach().cpu())
                 stash_dense_outputs(frame_output, [frame_id])
                 if is_keyframe:
                     written_frames.append(frame_id)
                 memory_rows.append(row)
     finally:
-        for remove in removers:
+        for remove in reversed(removers):
             remove()
 
     pose_enc = torch.cat(pose_chunks, dim=1)
@@ -355,6 +428,31 @@ def run_streaming_reconstruction(cfg: dict[str, Any]) -> dict[str, Any]:
         hook_store.save_npz(qkv_dir)
     if interaction_writer is not None:
         interaction_writer.close()
+
+    causal_intervention_stats_path = None
+    if causal_intervention_rows:
+        causal_intervention_stats_path = out_dir / "causal_intervention_stats.jsonl"
+        write_memory_state_jsonl(causal_intervention_stats_path, causal_intervention_rows)
+
+    representation_index_path = None
+    if representation_store is not None:
+        representation_index_path = out_dir / "representation_capture_index.json"
+        write_json(
+            representation_index_path,
+            {
+                "status": "complete",
+                "output_dir": str(representation_store.output_dir),
+                "selected_frames": sorted(representation_store.selected_frames),
+                "selected_layers": (
+                    "all"
+                    if representation_store.selected_layers is None
+                    else sorted(representation_store.selected_layers)
+                ),
+                "storage_dtype": representation_store.storage_dtype,
+                "num_records": len(representation_store.saved),
+                "records": representation_store.saved,
+            },
+        )
 
     if dense_chunks:
         dense_dir = ensure_dir(out_dir / "dense")
@@ -393,6 +491,11 @@ def run_streaming_reconstruction(cfg: dict[str, Any]) -> dict[str, Any]:
         "interaction_output_dir": cfg.get("interaction_output_dir") if interaction_writer is not None else None,
         "sdpa_skip_append_patch_installed": sdpa_skip_patch_installed,
         "aggregator_keyframe_skip_append_effective": bool(sdpa_skip_patch_installed and keyframe_interval > 1),
+        "causal_intervention": cfg.get("causal_intervention", {"enabled": False}),
+        "causal_intervention_patch_installed": bool(causal_intervention_installed),
+        "causal_intervention_stats_path": str(causal_intervention_stats_path) if causal_intervention_stats_path else None,
+        "representation_capture": cfg.get("representation_capture", {"enabled": False}),
+        "representation_capture_index": str(representation_index_path) if representation_index_path else None,
         "resume_policy": cfg.get("resume", {"enabled": False, "reason": "KV-state serialization is not implemented."}),
         "notes": [
             "Predicted poses use the official demo postprocess convention.",

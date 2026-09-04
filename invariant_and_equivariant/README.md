@@ -47,6 +47,7 @@ python scripts/run_forward_equivariance.py --config configs/smoke.yaml
 python scripts/run_homogeneity.py --config configs/smoke.yaml
 python scripts/run_subspace_analysis.py --config configs/smoke.yaml
 python scripts/run_intervention.py --config configs/smoke.yaml
+python scripts/run_e9_move_controls.py --config configs/smoke.yaml
 python scripts/run_composition.py --config configs/smoke.yaml
 python scripts/build_report.py --run-dir outputs/smoke_v1
 ```
@@ -68,4 +69,3 @@ The default smoke run uses scene-level splits:
 - test: `scene_003`
 
 Each scene uses a `3x3` position subset and cameras `camera_000`, `camera_003`, `camera_006`, `camera_009`.
-

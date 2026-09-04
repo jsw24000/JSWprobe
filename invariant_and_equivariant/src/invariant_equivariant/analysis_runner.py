@@ -511,6 +511,421 @@ def run_intervention(config_path: Path) -> Dict[str, Any]:
     return {"metrics": len(metric_rows)}
 
 
+def _top_pca_basis(x: np.ndarray, rank: int) -> Tuple[np.ndarray, np.ndarray]:
+    x = np.asarray(x, dtype=np.float64)
+    if x.ndim != 2 or x.shape[0] == 0 or x.shape[1] == 0 or rank <= 0:
+        dim = x.shape[1] if x.ndim == 2 else 0
+        return np.zeros((dim, 0), dtype=np.float64), np.zeros((0,), dtype=np.float64)
+    xc = x - x.mean(axis=0, keepdims=True)
+    cov = xc.T @ xc
+    values, vectors = np.linalg.eigh(cov)
+    order = np.argsort(values)[::-1]
+    keep = order[: min(rank, x.shape[1])]
+    q = vectors[:, keep]
+    # Make saved bases deterministic up to sign.
+    for idx in range(q.shape[1]):
+        pivot = int(np.argmax(np.abs(q[:, idx])))
+        if q[pivot, idx] < 0:
+            q[:, idx] *= -1.0
+    return q, values[keep]
+
+
+def _fit_position_after_transform(
+    config: Mapping[str, Any],
+    rows: Sequence[Mapping[str, Any]],
+    x: np.ndarray,
+    y: np.ndarray,
+) -> Tuple[Dict[str, float], float]:
+    split_masks = masks(rows)
+    model = choose_alpha(
+        x[split_masks["train"]],
+        y[split_masks["train"]],
+        x[split_masks["validation"]],
+        y[split_masks["validation"]],
+        config["analysis"]["ridge_alphas"],
+        standardize_x=False,
+    )
+    pred = model.predict(x)
+    return regression_metrics(y[split_masks["test"]], pred[split_masks["test"]]), float(model.alpha)
+
+
+def _summary_stats(values: Sequence[float]) -> Dict[str, float]:
+    arr = np.asarray(list(values), dtype=np.float64)
+    if arr.size == 0:
+        return {"mean": float("nan"), "std": float("nan"), "min": float("nan"), "max": float("nan")}
+    return {
+        "mean": float(np.mean(arr)),
+        "std": float(np.std(arr)),
+        "min": float(np.min(arr)),
+        "max": float(np.max(arr)),
+    }
+
+
+def _first_metric(metrics_by_space: Mapping[str, Mapping[str, float]], space: str, metric: str) -> float:
+    return float(metrics_by_space.get(space, {}).get(metric, float("nan")))
+
+
+def _e9_summary_report(summary_rows: Sequence[Mapping[str, Any]], shuffle_repeats: int, stability_repeats: int) -> str:
+    columns = [
+        "model_name",
+        "layer_name",
+        "raw_r2",
+        "remove_true_move_r2",
+        "remove_shuffled_move_mean_r2",
+        "remove_pca_z_top2_r2",
+        "remove_pca_dz_top2_r2",
+        "true_vs_shuffled_extra_drop_r2",
+        "stability_mean_principal_angle_deg_mean",
+    ]
+    lines = [
+        "# E9 Move Controls",
+        "",
+        "E9 tests whether the rank-2 forward move subspace is tied to the real delta_p to delta_z relation rather than to generic high-variance feature directions.",
+        "",
+        "Controls:",
+        "",
+        "- Shuffled-motion: shuffle train-pair delta_p before fitting a same-rank move basis, remove it from z, and retrain the absolute-position probe.",
+        "- PCA rank-matched: remove top-2 PCA directions from train z and train delta_z, then retrain the absolute-position probe.",
+        "- Cross-split stability: fit move bases on independent train-scene halves and compare principal angles.",
+        "",
+        f"Shuffle repeats: {shuffle_repeats}; stability repeats: {stability_repeats}.",
+        "",
+        "| " + " | ".join(columns) + " |",
+        "| " + " | ".join(["---"] * len(columns)) + " |",
+    ]
+    for row in summary_rows:
+        vals = []
+        for col in columns:
+            val = row.get(col, "")
+            if isinstance(val, float):
+                vals.append(f"{val:.4g}")
+            else:
+                vals.append(str(val))
+        lines.append("| " + " | ".join(vals) + " |")
+    lines.extend(
+        [
+            "",
+            "Positive `true_vs_shuffled_extra_drop_r2` means removing the true move basis hurts the position probe more than removing shuffled-motion controls.",
+            "Positive `true_vs_pca_z_extra_drop_r2` or `true_vs_pca_dz_extra_drop_r2` means the true move basis hurts more than the corresponding PCA control.",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def run_e9_move_controls(config_path: Path) -> Dict[str, Any]:
+    """E9 controls for the rank-2 forward move subspace."""
+    config = load_config(config_path)
+    output_dir = Path(config["_output_dir"])
+    out = ensure_dir(output_dir / "e9_move_controls")
+    grouped = grouped_feature_rows(output_dir)
+    rank = int(config["analysis"]["subspace_rank"])
+    control_cfg = config.get("move_controls", {})
+    shuffle_repeats = int(control_cfg.get("shuffle_repeats", config["analysis"].get("random_subspace_repeats", 20)))
+    stability_repeats = int(control_cfg.get("stability_repeats", config["analysis"].get("random_subspace_repeats", 20)))
+    rng = np.random.default_rng(int(control_cfg.get("random_seed", config["analysis"]["random_seed"])))
+
+    metric_rows: List[Dict[str, Any]] = []
+    detail_rows: List[Dict[str, Any]] = []
+    summary_rows: List[Dict[str, Any]] = []
+
+    for (model_name, layer_name), rows in grouped.items():
+        variant = rows[0]["model_variant"]
+        row_masks = masks(rows)
+        ntrain_rows = int(row_masks["train"].sum())
+        nval_rows = int(row_masks["validation"].sum())
+        ntest_rows = int(row_masks["test"].sum())
+        if ntrain_rows < 2 or nval_rows < 1 or ntest_rows < 1:
+            continue
+
+        x_raw = load_x(rows)
+        feature_std = Standardizer.fit(x_raw[row_masks["train"]])
+        xstd = feature_std.transform(x_raw)
+        y_pos = load_y(rows, "ref")
+
+        delta_p, dz, pairs, _fmap = forward_arrays(config, rows)
+        if len(pairs) == 0:
+            continue
+        pair_masks = {split: np.asarray([p["split"] == split for p in pairs], dtype=bool) for split in ["train", "validation", "test"]}
+        if pair_masks["train"].sum() < 2 or pair_masks["validation"].sum() < 1 or pair_masks["test"].sum() < 1:
+            continue
+        ntrain_pairs = int(pair_masks["train"].sum())
+        nval_pairs = int(pair_masks["validation"].sum())
+        ntest_pairs = int(pair_masks["test"].sum())
+
+        true_forward = choose_alpha(
+            delta_p[pair_masks["train"]],
+            dz[pair_masks["train"]],
+            delta_p[pair_masks["validation"]],
+            dz[pair_masks["validation"]],
+            config["analysis"]["ridge_alphas"],
+            standardize_x=False,
+            fit_intercept=False,
+        )
+        true_pred = true_forward.predict(delta_p)
+        true_forward_metrics = feature_forward_metrics(dz[pair_masks["test"]], true_pred[pair_masks["test"]])
+        true_b = true_forward.weights.T
+        true_singular_values = np.linalg.svd(true_b, compute_uv=False)
+        q_true = orthonormal_basis(true_b, rank)
+
+        q_pca_z, pca_z_values = _top_pca_basis(xstd[row_masks["train"]], rank)
+        q_pca_dz, pca_dz_values = _top_pca_basis(dz[pair_masks["train"]], rank)
+        np.savez_compressed(
+            out / f"{model_name}_{layer_name}_bases.npz",
+            Q_move_true=q_true,
+            Q_pca_z_top2=q_pca_z,
+            Q_pca_dz_top2=q_pca_dz,
+            true_forward_singular_values=true_singular_values,
+            pca_z_eigenvalues=pca_z_values,
+            pca_dz_eigenvalues=pca_dz_values,
+            x_mean=feature_std.mean,
+            x_std=feature_std.std,
+        )
+
+        transforms = {
+            "raw_standardized": xstd,
+            "remove_true_move": transform_with_subspace(xstd, q_true, "remove"),
+            "remove_pca_z_top2": transform_with_subspace(xstd, q_pca_z, "remove"),
+            "remove_pca_dz_top2": transform_with_subspace(xstd, q_pca_dz, "remove"),
+        }
+        metrics_by_space: Dict[str, Dict[str, float]] = {}
+        position_alpha_by_space: Dict[str, float] = {}
+        for feature_space, xt in transforms.items():
+            metrics, alpha = _fit_position_after_transform(config, rows, xt, y_pos)
+            metrics_by_space[feature_space] = metrics
+            position_alpha_by_space[feature_space] = alpha
+            for metric_name, value in metrics.items():
+                metric_rows.append(
+                    metric_row(
+                        config,
+                        model_name,
+                        variant,
+                        layer_name,
+                        metric_name,
+                        value,
+                        "test",
+                        "ref",
+                        ntrain_rows,
+                        nval_rows,
+                        ntest_rows,
+                        feature_space,
+                    )
+                )
+
+        shuffle_metrics: Dict[str, List[float]] = defaultdict(list)
+        train_pair_indices = np.flatnonzero(pair_masks["train"])
+        for repeat in range(shuffle_repeats):
+            shuffled_delta_p_train = delta_p[train_pair_indices][rng.permutation(len(train_pair_indices))]
+            shuffled_forward = fit_ridge(
+                shuffled_delta_p_train,
+                dz[train_pair_indices],
+                alpha=float(true_forward.alpha),
+                standardize_x=False,
+                fit_intercept=False,
+            )
+            q_shuffle = orthonormal_basis(shuffled_forward.weights.T, rank)
+            xt = transform_with_subspace(xstd, q_shuffle, "remove")
+            metrics, alpha = _fit_position_after_transform(config, rows, xt, y_pos)
+            for metric_name, value in metrics.items():
+                shuffle_metrics[metric_name].append(value)
+            detail_rows.append(
+                {
+                    "record_type": "shuffled_motion",
+                    "model_name": model_name,
+                    "layer_name": layer_name,
+                    "repeat": repeat,
+                    "rank": rank,
+                    "forward_alpha": float(true_forward.alpha),
+                    "position_alpha": alpha,
+                    "num_train_rows": ntrain_rows,
+                    "num_val_rows": nval_rows,
+                    "num_test_rows": ntest_rows,
+                    "num_train_pairs": ntrain_pairs,
+                    "r2": metrics.get("r2", float("nan")),
+                    "vector_mae": metrics.get("vector_mae", float("nan")),
+                    "true_move_overlap": subspace_metrics(q_true, q_shuffle).get("projection_overlap", float("nan")),
+                    "true_move_mean_principal_angle_deg": subspace_metrics(q_true, q_shuffle).get("mean_principal_angle_deg", float("nan")),
+                }
+            )
+
+        shuffle_summary: Dict[str, Dict[str, float]] = {}
+        for metric_name, values in shuffle_metrics.items():
+            stats = _summary_stats(values)
+            shuffle_summary[metric_name] = stats
+            metric_rows.append(
+                metric_row(
+                    config,
+                    model_name,
+                    variant,
+                    layer_name,
+                    metric_name,
+                    stats["mean"],
+                    "test",
+                    "ref",
+                    ntrain_rows,
+                    nval_rows,
+                    ntest_rows,
+                    "remove_shuffled_move_mean",
+                )
+            )
+            metric_rows.append(
+                metric_row(
+                    config,
+                    model_name,
+                    variant,
+                    layer_name,
+                    f"{metric_name}_std",
+                    stats["std"],
+                    "test",
+                    "ref",
+                    ntrain_rows,
+                    nval_rows,
+                    ntest_rows,
+                    "remove_shuffled_move_mean",
+                )
+            )
+
+        stability_values: Dict[str, List[float]] = defaultdict(list)
+        train_scene_ids = sorted({str(p["scene_id"]) for idx, p in enumerate(pairs) if pair_masks["train"][idx]})
+        if len(train_scene_ids) >= 2:
+            half = max(1, len(train_scene_ids) // 2)
+            for repeat in range(stability_repeats):
+                scene_order = list(train_scene_ids)
+                if repeat > 0:
+                    rng.shuffle(scene_order)
+                scenes_a = set(scene_order[:half])
+                scenes_b = set(scene_order[half:])
+                mask_a = pair_masks["train"] & np.asarray([str(p["scene_id"]) in scenes_a for p in pairs], dtype=bool)
+                mask_b = pair_masks["train"] & np.asarray([str(p["scene_id"]) in scenes_b for p in pairs], dtype=bool)
+                if mask_a.sum() < 2 or mask_b.sum() < 2:
+                    continue
+                model_a = fit_ridge(delta_p[mask_a], dz[mask_a], alpha=float(true_forward.alpha), standardize_x=False, fit_intercept=False)
+                model_b = fit_ridge(delta_p[mask_b], dz[mask_b], alpha=float(true_forward.alpha), standardize_x=False, fit_intercept=False)
+                q_a = orthonormal_basis(model_a.weights.T, rank)
+                q_b = orthonormal_basis(model_b.weights.T, rank)
+                metrics = subspace_metrics(q_a, q_b)
+                for metric_name, value in metrics.items():
+                    stability_values[metric_name].append(value)
+                detail_rows.append(
+                    {
+                        "record_type": "cross_split_stability",
+                        "model_name": model_name,
+                        "layer_name": layer_name,
+                        "repeat": repeat,
+                        "rank": rank,
+                        "forward_alpha": float(true_forward.alpha),
+                        "scene_ids_a": "|".join(sorted(scenes_a)),
+                        "scene_ids_b": "|".join(sorted(scenes_b)),
+                        "num_pairs_a": int(mask_a.sum()),
+                        "num_pairs_b": int(mask_b.sum()),
+                        **metrics,
+                    }
+                )
+
+        stability_summary: Dict[str, Dict[str, float]] = {}
+        for metric_name, values in stability_values.items():
+            stats = _summary_stats(values)
+            stability_summary[metric_name] = stats
+            for stat_name, value in stats.items():
+                metric_rows.append(
+                    metric_row(
+                        config,
+                        model_name,
+                        variant,
+                        layer_name,
+                        f"stability_{metric_name}_{stat_name}",
+                        value,
+                        "test",
+                        "ref",
+                        ntrain_pairs,
+                        nval_pairs,
+                        ntest_pairs,
+                        "stability_scene_halves",
+                    )
+                )
+
+        raw_r2 = _first_metric(metrics_by_space, "raw_standardized", "r2")
+        true_r2 = _first_metric(metrics_by_space, "remove_true_move", "r2")
+        shuffle_r2 = shuffle_summary.get("r2", {}).get("mean", float("nan"))
+        pca_z_r2 = _first_metric(metrics_by_space, "remove_pca_z_top2", "r2")
+        pca_dz_r2 = _first_metric(metrics_by_space, "remove_pca_dz_top2", "r2")
+
+        derived_metrics = {
+            "true_degradation_r2": raw_r2 - true_r2,
+            "shuffled_degradation_mean_r2": raw_r2 - shuffle_r2,
+            "pca_z_degradation_r2": raw_r2 - pca_z_r2,
+            "pca_dz_degradation_r2": raw_r2 - pca_dz_r2,
+            "true_vs_shuffled_extra_drop_r2": shuffle_r2 - true_r2,
+            "true_vs_pca_z_extra_drop_r2": pca_z_r2 - true_r2,
+            "true_vs_pca_dz_extra_drop_r2": pca_dz_r2 - true_r2,
+        }
+        for metric_name, value in derived_metrics.items():
+            metric_rows.append(
+                metric_row(
+                    config,
+                    model_name,
+                    variant,
+                    layer_name,
+                    metric_name,
+                    value,
+                    "test",
+                    "ref",
+                    ntrain_rows,
+                    nval_rows,
+                    ntest_rows,
+                    "e9_summary",
+                )
+            )
+
+        summary_rows.append(
+            {
+                "model_name": model_name,
+                "model_variant": variant,
+                "layer_name": layer_name,
+                "rank": rank,
+                "true_forward_alpha": float(true_forward.alpha),
+                "position_alpha_raw": position_alpha_by_space.get("raw_standardized", float("nan")),
+                "position_alpha_remove_true_move": position_alpha_by_space.get("remove_true_move", float("nan")),
+                "num_train_rows": ntrain_rows,
+                "num_val_rows": nval_rows,
+                "num_test_rows": ntest_rows,
+                "num_train_pairs": ntrain_pairs,
+                "num_val_pairs": nval_pairs,
+                "num_test_pairs": ntest_pairs,
+                "forward_r2_test": true_forward_metrics.get("forward_r2", float("nan")),
+                "forward_cosine_test": true_forward_metrics.get("forward_cosine", float("nan")),
+                "normalized_forward_error_test": true_forward_metrics.get("normalized_forward_error", float("nan")),
+                "raw_r2": raw_r2,
+                "remove_true_move_r2": true_r2,
+                "remove_shuffled_move_mean_r2": shuffle_r2,
+                "remove_shuffled_move_std_r2": shuffle_summary.get("r2", {}).get("std", float("nan")),
+                "remove_pca_z_top2_r2": pca_z_r2,
+                "remove_pca_dz_top2_r2": pca_dz_r2,
+                "true_degradation_r2": derived_metrics["true_degradation_r2"],
+                "shuffled_degradation_mean_r2": derived_metrics["shuffled_degradation_mean_r2"],
+                "pca_z_degradation_r2": derived_metrics["pca_z_degradation_r2"],
+                "pca_dz_degradation_r2": derived_metrics["pca_dz_degradation_r2"],
+                "true_vs_shuffled_extra_drop_r2": derived_metrics["true_vs_shuffled_extra_drop_r2"],
+                "true_vs_pca_z_extra_drop_r2": derived_metrics["true_vs_pca_z_extra_drop_r2"],
+                "true_vs_pca_dz_extra_drop_r2": derived_metrics["true_vs_pca_dz_extra_drop_r2"],
+                "stability_mean_principal_angle_deg_mean": stability_summary.get("mean_principal_angle_deg", {}).get("mean", float("nan")),
+                "stability_mean_principal_angle_deg_std": stability_summary.get("mean_principal_angle_deg", {}).get("std", float("nan")),
+                "stability_mean_principal_angle_deg_min": stability_summary.get("mean_principal_angle_deg", {}).get("min", float("nan")),
+                "stability_mean_principal_angle_deg_max": stability_summary.get("mean_principal_angle_deg", {}).get("max", float("nan")),
+                "stability_projection_overlap_mean": stability_summary.get("projection_overlap", {}).get("mean", float("nan")),
+                "true_move_singular_values": "|".join(f"{v:.8g}" for v in true_singular_values[: min(3, len(true_singular_values))]),
+                "pca_z_eigenvalues": "|".join(f"{v:.8g}" for v in pca_z_values[: min(rank, len(pca_z_values))]),
+                "pca_dz_eigenvalues": "|".join(f"{v:.8g}" for v in pca_dz_values[: min(rank, len(pca_dz_values))]),
+            }
+        )
+
+    write_csv(out / "metrics.csv", metric_rows)
+    write_json(out / "metrics.json", {"metrics": metric_rows})
+    write_csv(out / "control_details.csv", detail_rows)
+    write_csv(out / "summary.csv", summary_rows)
+    (out / "report.md").write_text(_e9_summary_report(summary_rows, shuffle_repeats, stability_repeats), encoding="utf-8")
+    return {"metrics": len(metric_rows), "details": len(detail_rows), "summary_rows": len(summary_rows)}
+
+
 def _primitive_pair(config: Mapping[str, Any], pair: Mapping[str, Any]) -> bool:
     tags = set(pair.get("pair_tags", []))
     primitive_tags = set(config.get("decode_composition", config["composition"]).get("primitive_tags", config["composition"]["primitive_tags"]))

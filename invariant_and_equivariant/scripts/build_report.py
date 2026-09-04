@@ -17,6 +17,7 @@ ANALYSIS_METRIC_FILES = [
     ("homogeneity", "metrics.csv"),
     ("subspaces", "subspace_metrics.csv"),
     ("intervention", "metrics.csv"),
+    ("e9_move_controls", "metrics.csv"),
     ("composition", "metrics.csv"),
 ]
 
@@ -106,6 +107,15 @@ def compact_rows(rows: Sequence[Mapping[str, str]]) -> List[Dict[str, Any]]:
         "triplet_top1",
         "triplet_top3",
         "triplet_grid_distance",
+        "true_degradation_r2",
+        "shuffled_degradation_mean_r2",
+        "pca_z_degradation_r2",
+        "pca_dz_degradation_r2",
+        "true_vs_shuffled_extra_drop_r2",
+        "true_vs_pca_z_extra_drop_r2",
+        "true_vs_pca_dz_extra_drop_r2",
+        "stability_mean_principal_angle_deg_mean",
+        "stability_projection_overlap_mean",
     }
     compact: List[Dict[str, Any]] = []
     for row in rows:
@@ -168,6 +178,33 @@ def collect_metrics(run_dir: Path) -> List[Dict[str, Any]]:
     return rows
 
 
+def e9_summary_rows(run_dir: Path) -> List[Dict[str, Any]]:
+    rows = read_csv(run_dir / "e9_move_controls" / "summary.csv")
+    columns = [
+        "model_name",
+        "layer_name",
+        "forward_r2_test",
+        "raw_r2",
+        "remove_true_move_r2",
+        "remove_shuffled_move_mean_r2",
+        "remove_pca_z_top2_r2",
+        "remove_pca_dz_top2_r2",
+        "true_vs_shuffled_extra_drop_r2",
+        "stability_mean_principal_angle_deg_mean",
+    ]
+    compact: List[Dict[str, Any]] = []
+    for row in rows:
+        item: Dict[str, Any] = {}
+        for col in columns:
+            val = row.get(col, "")
+            try:
+                item[col] = f"{float(val):.4g}"
+            except (TypeError, ValueError):
+                item[col] = val
+        compact.append(item)
+    return compact
+
+
 def plot_summary_figures(rows: Sequence[Mapping[str, Any]], run_dir: Path) -> List[str]:
     try:
         import matplotlib.pyplot as plt
@@ -221,6 +258,7 @@ def build_report(run_dir: Path) -> Dict[str, Any]:
     metrics = collect_metrics(run_dir)
     write_csv(tables_dir / "main_smoke_results.csv", metrics)
     compact = compact_rows(metrics)
+    e9_compact = e9_summary_rows(run_dir)
     figure_paths = plot_summary_figures(metrics, run_dir)
     (tables_dir / "main_smoke_results.md").write_text(
         markdown_table(compact, ["analysis", "model", "layer", "space", "metric", "value", "n_test"], limit=80),
@@ -242,6 +280,7 @@ def build_report(run_dir: Path) -> Dict[str, Any]:
         "model_inventory": inventory,
         "main_results_csv": str(tables_dir / "main_smoke_results.csv"),
         "main_results_md": str(tables_dir / "main_smoke_results.md"),
+        "e9_summary_csv": str(run_dir / "e9_move_controls" / "summary.csv") if e9_compact else "",
         "figures": figure_paths,
         "metric_rows": len(metrics),
     }
@@ -289,9 +328,30 @@ def build_report(run_dir: Path) -> Dict[str, Any]:
         "",
         (tables_dir / "main_smoke_results.md").read_text(encoding="utf-8"),
         "",
+        "## E9 Move Controls",
+        "",
+        "E9 compares true forward-move removal against shuffled-motion and PCA rank-matched controls, then checks cross-scene-half move-subspace stability.",
+        "",
+        markdown_table(
+            e9_compact,
+            [
+                "model_name",
+                "layer_name",
+                "forward_r2_test",
+                "raw_r2",
+                "remove_true_move_r2",
+                "remove_shuffled_move_mean_r2",
+                "remove_pca_z_top2_r2",
+                "remove_pca_dz_top2_r2",
+                "true_vs_shuffled_extra_drop_r2",
+                "stability_mean_principal_angle_deg_mean",
+            ],
+            limit=16,
+        ),
+        "",
         "## Interpretation Boundary",
         "",
-        "These smoke numbers validate the engineering loop. A successful probe means the information is linearly readable; delta decoding means displacement is present in feature differences; forward mapping means physical displacement explains some real feature change; subspace overlap is preliminary evidence that readout and motion may share directions; composition success would support primitive-to-composite generalization. This smoke run is not a proof of a strict group representation.",
+        "These smoke numbers validate the engineering loop. A successful probe means the information is linearly readable; delta decoding means displacement is present in feature differences; forward mapping means physical displacement explains some real feature change; subspace overlap and E9 controls are evidence about whether the move space is specific and stable; composition success would support primitive-to-composite generalization. This smoke run is not a proof of a strict group representation.",
         "",
         "## Full Experiment Command",
         "",

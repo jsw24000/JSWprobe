@@ -71,6 +71,9 @@ oxford_spires_minimal/downloads/
 *.gif
 *.glb
 *.gltf
+*.jpg
+*.jpeg
+*.png
 
 # Editor and OS files
 .DS_Store

@@ -41,6 +41,7 @@ Usage:
 """
 
 import argparse
+import csv
 import re
 import zipfile
 from pathlib import Path
@@ -622,7 +623,7 @@ def process_scene(
             stem  = Path(name).stem
             t_img = float(stem)
 
-            t_idx, _ = find_nearest(t_img, traj_ts, max_time_gap)
+            t_idx, pose_gap = find_nearest(t_img, traj_ts, max_time_gap)
             if t_idx is None:
                 skip_pose += 1
                 continue
@@ -681,7 +682,7 @@ def process_scene(
                     cv2.imwrite(str(out_dbg / f"{frame_idx:06d}.jpg"), overlay,
                                 [cv2.IMWRITE_JPEG_QUALITY, 90])
 
-            pose_records.append((frame_idx, stem, C2W))
+            pose_records.append((frame_idx, stem, t_img, int(t_idx), float(traj_ts[t_idx]), float(pose_gap), C2W))
             frame_idx += 1
 
     print(f"  Saved {len(pose_records)} frames  |  "
@@ -710,9 +711,36 @@ def process_scene(
 
     # ── poses_c2w.txt: 16 floats per line (4×4 C2W row-major)
     with open(dst / "poses_c2w.txt", "w") as f:
-        for _, _, C2W in pose_records:
+        for *_, C2W in pose_records:
             vals = " ".join(f"{v:.10f}" for v in C2W.flatten())
             f.write(f"{vals}\n")
+
+    sync_dir = dst / "timestamp_sync"
+    sync_dir.mkdir(parents=True, exist_ok=True)
+    with open(sync_dir / "frame_sync.csv", "w", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "frame_index",
+                "raw_image_timestamp",
+                "raw_image_name",
+                "gt_trajectory_index",
+                "gt_trajectory_timestamp",
+                "abs_time_gap_s",
+            ],
+        )
+        writer.writeheader()
+        for frame_idx, stem, t_img, t_idx, t_gt, pose_gap, _ in pose_records:
+            writer.writerow(
+                {
+                    "frame_index": frame_idx,
+                    "raw_image_timestamp": f"{t_img:.9f}",
+                    "raw_image_name": f"cam0/{stem}.jpg",
+                    "gt_trajectory_index": t_idx,
+                    "gt_trajectory_timestamp": f"{t_gt:.9f}",
+                    "abs_time_gap_s": f"{pose_gap:.9f}",
+                }
+            )
 
     # ── intrinsics.txt: fx fy cx cy width height
     with open(dst / "intrinsics.txt", "w") as f:

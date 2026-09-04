@@ -1,0 +1,30 @@
+inherits: full_5968_direct_kf5_online_interactions.yaml
+run_name: causal_full_5968_direct_kf5_baseline
+
+reconstruction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_long_seq/baseline/reconstruction
+interaction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_long_seq/baseline/interaction
+analysis_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_long_seq/baseline/analysis
+
+causal_intervention:
+  enabled: false
+
+representation_capture:
+  enabled: true
+  output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_long_seq/baseline/reconstruction/representations
+  frames: [2755, 3403, 4380, 4400, 4414, 4430, 4445]
+  layers: all
+  storage_dtype: float16
+
+outputs:
+  save_pose_all_frames: true
+  save_depth_all_frames: false
+  save_world_points_all_frames: false
+  save_depth_stride: 0
+  save_world_points_stride: 0
+  save_depth_frames: [2755, 3403, 4380, 4400, 4414, 4430, 4445]
+  save_world_points_frames: [2755, 3403, 4380, 4400, 4414, 4430, 4445]
+  save_keyframe_schedule: true
+  save_memory_state_summary: true
+  save_dense_outputs: false
+
+status: prepared_causal_baseline_do_not_auto_run

@@ -10,6 +10,6 @@ The main smoke questions are:
 4. Are the position-readout and motion-induced subspaces aligned?
 5. Does removing those subspaces reduce position information more than a random same-rank projection?
 6. Can primitive translations predict real rendered composite states?
+7. E9: Is the rank-2 forward move subspace more meaningful than shuffled-motion and PCA rank-matched controls, and is it stable across independent train-scene halves?
 
 Smoke results are engineering validation, not scientific proof. Reports should use cautious language such as "supports", "is consistent with", and "provides preliminary evidence".
-

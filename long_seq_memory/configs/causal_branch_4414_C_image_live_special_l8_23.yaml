@@ -1,0 +1,25 @@
+inherits: causal_branch_4414_baseline.yaml
+run_name: causal_branch_4414_C_image_live_special_l8_23
+
+reconstruction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_branch_4414/C_image_live_special_l8_23/reconstruction
+interaction_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_branch_4414/C_image_live_special_l8_23/interaction
+analysis_output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_branch_4414/C_image_live_special_l8_23/analysis
+
+causal_intervention:
+  enabled: true
+  name: C_image_to_live_special_frame4414_l8_23
+  mode: image_to_live_special
+  frames: [4414]
+  layers: [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+  num_special_tokens: 6
+  include_old_memory_special_keys: false
+  apply_when_old_memory_present: true
+
+representation_capture:
+  enabled: true
+  output_dir: /home/3dsm/Desktop/JSWprobe/long_seq_memory/outputs/causal_branch_4414/C_image_live_special_l8_23/reconstruction/representations
+  frames: [3403, 4414]
+  layers: all
+  storage_dtype: float16
+
+status: prepared_current_frame_branch_C_do_not_auto_run

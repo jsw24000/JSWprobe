@@ -1,0 +1,10 @@
+name: e9_move_controls
+question: Is the rank-2 forward move subspace tied to the real delta_p to delta_z relation?
+rank: 2
+feature_space: raw_standardized
+controls:
+  - shuffled_motion_move_space
+  - pca_top2_z
+  - pca_top2_delta_z
+  - cross_split_scene_halves
+position_probe_after_removal: ridge_ref_camera

@@ -46,3 +46,13 @@ position_current_x/y/z
 
 The smoke pipeline writes CSV, JSON, NPZ, PNG, and Markdown outputs only. Parquet can be added later if a stable dependency is introduced.
 
+E9 move-control outputs live under `e9_move_controls/`:
+
+```text
+metrics.csv          summary metric rows following the common schema
+metrics.json         JSON copy of the metric rows
+summary.csv          one compact row per model/layer
+control_details.csv  per-shuffle and per-scene-half stability records
+*_bases.npz          true move, PCA-z, and PCA-delta-z rank-matched bases
+report.md            protocol and compact result table
+```

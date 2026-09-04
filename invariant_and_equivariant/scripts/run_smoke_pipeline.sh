@@ -70,6 +70,9 @@ run_step subspace_analysis "${STAMP_DIR}/subspace_analysis.done" \
 run_step intervention "${STAMP_DIR}/intervention.done" \
   python scripts/run_intervention.py --config "${CONFIG}"
 
+run_step e9_move_controls "${STAMP_DIR}/e9_move_controls.done" \
+  python scripts/run_e9_move_controls.py --config "${CONFIG}"
+
 run_step composition "${STAMP_DIR}/composition.done" \
   python scripts/run_composition.py --config "${CONFIG}"
 
