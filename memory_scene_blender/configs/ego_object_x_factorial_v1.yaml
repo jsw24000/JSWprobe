@@ -1,0 +1,95 @@
+{
+  "dataset_name": "ego_object_x_factorial_v1",
+  "schema_version": 1,
+  "seed": 20260904,
+  "output_root": "memory_scene_blender/outputs/ego_object_x_factorial_v1",
+  "source": {
+    "dataset_root": "memory_scene_blender/outputs/object_translation_v1",
+    "config": "memory_scene_blender/configs/object_translation_v1.yaml",
+    "mode": "full",
+    "expected_dataset_name": "object_translation_v1",
+    "require_exact_scene_match": true
+  },
+  "motion": {
+    "axis_world": [1.0, 0.0, 0.0],
+    "delta_m": 0.04,
+    "levels": [-2, -1, 0, 1, 2],
+    "temporal_profile": "linear",
+    "future_default_num_frames": 16
+  },
+  "render": {
+    "engine": "BLENDER_EEVEE",
+    "color_mode": "RGB",
+    "depth_format": "OPEN_EXR",
+    "normal_format": "PNG",
+    "albedo_enabled": true,
+    "normal_enabled": true,
+    "instance_enabled": true,
+    "semantic_enabled": true,
+    "skip_existing": false
+  },
+  "modes": {
+    "smoke": {
+      "scene_ids": ["scene_000"],
+      "anchors_per_scene": 1,
+      "base_cameras_per_anchor": 1,
+      "num_frames": 8,
+      "resolution": [512, 512],
+      "samples": 4,
+      "output_subdir": "smoke"
+    },
+    "pilot": {
+      "scene_ids": ["scene_000", "scene_001"],
+      "anchors_per_scene": 2,
+      "base_cameras_per_anchor": 1,
+      "num_frames": 8,
+      "resolution": [512, 512],
+      "samples": 8,
+      "output_subdir": "pilot"
+    },
+    "full": {
+      "scene_count": 12,
+      "anchors_per_scene": 16,
+      "base_cameras_per_anchor": 2,
+      "num_frames": 16,
+      "resolution": [512, 512],
+      "samples": 32,
+      "output_subdir": "full"
+    }
+  },
+  "selection": {
+    "source_primary_cameras_only": false,
+    "min_initial_mask_area_ratio": 0.02,
+    "max_initial_mask_area_ratio": 0.25,
+    "reject_initial_truncation": true,
+    "max_initial_edge_touch_ratio": 0.01,
+    "edge_margin_px": 8,
+    "min_projected_point_in_image_fraction": 0.80,
+    "min_visible_surface_fraction": 0.10,
+    "ray_depth_tolerance_m": 0.025,
+    "static_clearance_m": 0.14,
+    "wall_margin_m": 0.45
+  },
+  "tracks": {
+    "num_surface_points": 192,
+    "sampling_seed_offset": 73471,
+    "visibility_depth_abs_tolerance_m": 0.03,
+    "visibility_depth_rel_tolerance": 0.015,
+    "visibility_pixel_radius": 1,
+    "min_common_visible_points": 24
+  },
+  "validation": {
+    "matrix_atol": 1e-7,
+    "displacement_atol_m": 1e-7,
+    "relative_equation_atol_m": 1e-8,
+    "matched_uv_mean_tolerance_px": 0.05,
+    "matched_uv_max_tolerance_px": 0.25,
+    "compensated_uv_mean_tolerance_px": 0.05,
+    "compensated_uv_max_tolerance_px": 0.25,
+    "min_background_mean_abs_difference_8bit": 0.25,
+    "min_background_changed_fraction": 0.005,
+    "background_changed_pixel_threshold_8bit": 2.0,
+    "min_target_mask_area_ratio": 0.015,
+    "max_target_edge_touch_ratio": 0.01
+  }
+}

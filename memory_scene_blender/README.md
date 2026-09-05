@@ -122,6 +122,74 @@ blender --background --python memory_scene_blender/scripts/generate_object_trans
 This object-translation generator uses direct Blender Python rather than BlenderProc, skips complete frames by default, and supports `--overwrite`, `--scene-id`, `--state-start/--state-end`, and `--camera-start/--camera-end`.
 If the default output root already contains a smoke run, start the full run with `--overwrite` or pass a different `--output-root`; complete frames at a different resolution are rejected instead of mixed.
 
+## Ego/Object World-X Factorial Sequences
+
+`ego_object_x_factorial_v1` is a separate temporal dataset for comparing the
+observable target motion `r = o - e` with its camera/object causal
+decomposition.  It reads the `object_translation_v1` scene, 4x4 coarse anchor,
+and spatial camera-bank metadata without modifying that dataset.  A bank camera
+is selected as a fixed base pose; temporal camera poses preserve its rotation
+exactly and add only world-X translation.  The historical camera-bank
+intrinsics are deliberately not reused because their saved image-height field
+is corrupted; intrinsics are recomputed from the declared 60-degree FOV and
+the actual square render resolution.
+
+The default roots are mode-specific so a dry run, smoke render, and pilot
+cannot silently mix:
+
+```text
+memory_scene_blender/outputs/ego_object_x_factorial_v1/
+  _dry_runs/smoke/
+  _dry_runs/pilot/
+  smoke/
+  pilot/
+```
+
+Geometry-only smoke preflight (no image rendering):
+
+```bash
+blender --background --python memory_scene_blender/scripts/generate_ego_object_x_factorial_dataset.py -- \
+  --config memory_scene_blender/configs/ego_object_x_factorial_v1.yaml \
+  --mode smoke \
+  --dry-run
+python memory_scene_blender/scripts/validate_ego_object_x_factorial_dataset.py \
+  --dataset-root memory_scene_blender/outputs/ego_object_x_factorial_v1/_dry_runs/smoke \
+  --geometry-only
+```
+
+Render and validate the one-group, 200-frame smoke dataset:
+
+```bash
+blender --background --python memory_scene_blender/scripts/generate_ego_object_x_factorial_dataset.py -- \
+  --config memory_scene_blender/configs/ego_object_x_factorial_v1.yaml \
+  --mode smoke
+python memory_scene_blender/scripts/validate_ego_object_x_factorial_dataset.py \
+  --dataset-root memory_scene_blender/outputs/ego_object_x_factorial_v1/smoke
+python memory_scene_blender/scripts/render_ego_object_x_factorial_preview.py \
+  --dataset-root memory_scene_blender/outputs/ego_object_x_factorial_v1/smoke
+```
+
+Only after smoke validation passes, render and validate the four-group,
+800-frame pilot:
+
+```bash
+blender --background --python memory_scene_blender/scripts/generate_ego_object_x_factorial_dataset.py -- \
+  --config memory_scene_blender/configs/ego_object_x_factorial_v1.yaml \
+  --mode pilot
+python memory_scene_blender/scripts/validate_ego_object_x_factorial_dataset.py \
+  --dataset-root memory_scene_blender/outputs/ego_object_x_factorial_v1/pilot
+python memory_scene_blender/scripts/render_ego_object_x_factorial_preview.py \
+  --dataset-root memory_scene_blender/outputs/ego_object_x_factorial_v1/pilot
+```
+
+An interrupted identical run may use `--resume`.  `--overwrite` is accepted
+only for an output directory carrying this generator's dataset marker; it can
+never target or sit inside `object_translation_v1`.  `--scene-id`,
+`--anchor-id`, and `--base-camera-id` provide bounded debugging subsets.  The
+`full` mode is implemented for future expansion but is not part of the current
+pilot protocol.  A future non-dry-run full launch additionally requires the
+explicit `--allow-full` acknowledgement.
+
 Quick geometry-only check:
 
 ```bash
@@ -276,6 +344,48 @@ memory_scene_blender/outputs/object_translation_v1/
         semantic.png
         object_id.png
         frame_metadata.json
+  previews/
+```
+
+Ego/object factorial mode output:
+
+```text
+memory_scene_blender/outputs/ego_object_x_factorial_v1/pilot/
+  config_used.yaml
+  provenance.json
+  source_rebuild_audit.json
+  selection_report.json
+  dataset_summary.json
+  validation_summary.json
+  manifests/
+    scenes.jsonl
+    anchors.jsonl
+    base_cameras.jsonl
+    groups.jsonl
+    sequences.jsonl
+    frames.jsonl
+    matched_relative_groups.jsonl
+    track_sets.jsonl
+    splits.json
+  scene_000/
+    scene_metadata.json
+    canonical_surface_points.npz
+    anchor_xxx/camera_xxx/
+      group_metadata.json
+      sequences/<sequence_id>/
+        sequence_metadata.json
+        tracks.npz
+        frames/frame_000/
+          rgb.png
+          depth.exr
+          depth.npy
+          normal.png
+          albedo.png
+          target_mask.png
+          instance.png
+          semantic.png
+          object_id.png
+          frame_metadata.json
   previews/
 ```
 
