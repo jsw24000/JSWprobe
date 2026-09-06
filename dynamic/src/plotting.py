@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 COLORS={'Single':'#777777','Pair':'#2679b8','Full':'#db6b22','DINOv3':'#298c52'}
+LABELS={'dinov3':'DINOv3','dinov2':'DINOv2','vggt_omega':'Omega','vggt':'VGGT'}
 
 def read_csv(path):
     with open(path) as f:rows=list(csv.DictReader(f))
@@ -26,12 +27,12 @@ def curve(ax,rows,metric,rep,model='vggt_omega',regimes=('Single','Pair','Full')
             if not subset:continue
             by=defaultdict(list)
             for r in subset:by[r['group']].append(r)
-            color=COLORS['DINOv3' if model=='dinov3' else regime];style='--' if phase=='pre' else '-'
+            color=('#8b609e' if model=='dinov2' else (dict(Single='#a58966',Pair='#913a67',Full='#475ca3')[regime] if model=='vggt' else COLORS['DINOv3' if model=='dinov3' else regime]));style='--' if phase=='pre' else '-'
             all_y=[];x=None
             for rr in by.values():
                 rr=sorted(rr,key=lambda r:r['layer']);x=[r['layer'] for r in rr];y=[r['median'] for r in rr];all_y.append(y)
                 ax.plot(x,y,style,color=color,alpha=.16,lw=.9)
-            label='DINOv3' if model=='dinov3' else f'{regime} {phase}'
+            label=LABELS[model] if model in ['dinov3','dinov2'] else f'{LABELS[model]} {regime} {phase}'
             ax.plot(x,np.nanmedian(all_y,axis=0),style,color=color,lw=1.9,marker='o',ms=3,label=label,markerfacecolor='white' if phase=='pre' else color)
     ax.set_xlabel('Block index (zero-based)');ax.set_title(metric);ax.grid(alpha=.18)
 

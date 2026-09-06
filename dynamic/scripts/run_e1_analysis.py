@@ -6,10 +6,12 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import numpy as np
 from src.feature_io import arguments,configuration,config_hash,read_jsonl,write_json,digest
 from src.metrics import compute_metrics,summary
+from src.model_registry import shards_per_sequence
 
 
 def write_csv(path,rows):
-    if not rows:raise ValueError(f'No metric rows for {path}')
+    if not rows:
+        Path(path).write_text('group,model,regime,layer,phase,representation,unit_id,unit_type,metric,value\n');return
     with open(path,'w',newline='') as f:
         w=csv.DictWriter(f,fieldnames=list(rows[0]));w.writeheader();w.writerows(rows)
 
@@ -17,7 +19,7 @@ def write_csv(path,rows):
 def main():
     c=configuration(arguments('E1 group-wise intervention geometry').parse_args());out=Path(c['output_root'])
     gate=json.loads((out/'audit/extraction_full_validation.json').read_text());assert gate['passed'] and gate['config_hash']==config_hash(c)
-    da=json.loads((out/'audit/dataset_audit.json').read_text());rows=read_jsonl(out/'features/feature_manifest.jsonl');assert len(rows)==da['sequences']*4
+    da=json.loads((out/'audit/dataset_audit.json').read_text());rows=read_jsonl(out/'features/feature_manifest.jsonl');assert len(rows)==da['sequences']*shards_per_sequence(c)
     grouped=defaultdict(list)
     for r in rows:grouped[r['group'],r['model'],r['regime']].append(r)
     points=[];groups=[];matched=[];registers=[];dense=[]

@@ -1,0 +1,83 @@
+dataset_root: /home/3dsm/Desktop/JSWprobe/memory_scene_blender/outputs/ego_object_x_factorial_v1/pilot
+output_root: /home/3dsm/Desktop/JSWprobe/dynamic/outputs/e1_four_models
+python: /home/3dsm/miniconda3/envs/repr_vggt_dinov3/bin/python
+seed: 20260905
+input_resolution:
+- 512
+- 512
+device: cuda:0
+amp_dtype: bfloat16
+storage_dtype: float32
+min_mask_boundary_distance_px: 8
+min_core_points: 16
+max_core_points: 64
+clean_patch_occupancy: 0.9
+vggt_omega:
+  repo: /home/3dsm/Desktop/vggt-omega
+  checkpoint: /home/3dsm/Desktop/vggt-omega/checkpoints/vggt_omega_1b_512.pt
+  variant: VGGT-Omega-1B-512
+  layers:
+  - 0
+  - 2
+  - 4
+  - 6
+  - 9
+  - 11
+  - 14
+  - 17
+  - 20
+  - 23
+  register_only_layers:
+  - 2
+  - 6
+  - 9
+  - 14
+  - 20
+  regimes:
+  - Single
+  - Pair
+  - Full
+dinov3:
+  repo: /home/3dsm/Desktop/dinov3
+  checkpoint: /home/3dsm/Desktop/dinov3_weights/dinov3-vitl16-pretrain-lvd1689m/model.safetensors
+  variant: dinov3-vitl16-pretrain-lvd1689m
+  backend: transformers.DINOv3ViTModel
+  layers:
+  - 5
+  - 11
+  - 17
+  - 23
+models:
+- dinov3
+- vggt_omega
+- dinov2
+- vggt
+dinov2:
+  repo: /home/3dsm/Desktop/dinov2
+  checkpoint: /home/3dsm/Desktop/dinov2/weights/dinov2/dinov2_vitl14_reg4_pretrain.pth
+  variant: DINOv2-ViT-L/14-reg4
+  layers:
+  - 5
+  - 11
+  - 17
+  - 23
+vggt:
+  repo: /home/3dsm/Desktop/vggt
+  checkpoint: /home/3dsm/Desktop/vggt/checkpoints/model.pt
+  variant: VGGT-1B
+  layers:
+  - 0
+  - 2
+  - 4
+  - 6
+  - 9
+  - 11
+  - 14
+  - 17
+  - 20
+  - 23
+  regimes:
+  - Single
+  - Pair
+  - Full
+  register_only_layers: []

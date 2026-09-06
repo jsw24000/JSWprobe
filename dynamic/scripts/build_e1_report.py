@@ -9,7 +9,11 @@ from src.plotting import build_figures,read_csv
 
 
 def main():
-    c=configuration(arguments('Build measured E1 report and five figure groups').parse_args());out=Path(c['output_root'])
+    c=configuration(arguments('Build measured E1 report and five figure groups').parse_args())
+    if 'models' in c:
+        from src.comparison_report import build_model_report
+        build_model_report(c);return
+    out=Path(c['output_root'])
     da=json.loads((out/'audit/dataset_audit.json').read_text());ma=json.loads((out/'audit/model_audit.json').read_text());gate=json.loads((out/'audit/extraction_full_validation.json').read_text());fidelity=json.loads((out/'audit/forward_fidelity.json').read_text())
     assert gate['passed'] and fidelity['passed']
     groups=read_csv(out/'metrics/group_metrics.csv');layers=read_csv(out/'metrics/layer_metrics.csv');gs=sorted(da['core'])

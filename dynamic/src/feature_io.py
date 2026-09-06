@@ -40,8 +40,9 @@ def arguments(description):
     p = argparse.ArgumentParser(description=description)
     p.add_argument('--config', default=str(Path(__file__).resolve().parents[1] / 'configs/e1_pilot.yaml'))
     p.add_argument('--dataset-root'); p.add_argument('--output-root'); p.add_argument('--device')
-    p.add_argument('--dinov3-checkpoint'); p.add_argument('--vggt-omega-checkpoint')
-    p.add_argument('--dinov3-repo'); p.add_argument('--vggt-omega-repo')
+    p.add_argument('--models', nargs='+', choices=['dinov3','vggt_omega','dinov2','vggt'])
+    for name in ['dinov3','vggt-omega','dinov2','vggt']:
+        p.add_argument('--'+name+'-checkpoint');p.add_argument('--'+name+'-repo')
     return p
 
 
@@ -49,7 +50,8 @@ def configuration(args):
     cfg = yaml.safe_load(Path(args.config).read_text())
     for key in ['dataset_root', 'output_root', 'device']:
         if getattr(args, key, None): cfg[key] = getattr(args, key)
-    for model in ['dinov3', 'vggt_omega']:
+    if getattr(args,'models',None):cfg['models']=args.models
+    for model in ['dinov3', 'vggt_omega','dinov2','vggt']:
         for key in ['repo', 'checkpoint']:
             if getattr(args, model + '_' + key, None): cfg[model][key] = getattr(args, model + '_' + key)
     return cfg

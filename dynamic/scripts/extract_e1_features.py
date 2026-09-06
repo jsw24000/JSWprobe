@@ -7,13 +7,14 @@ import numpy as np
 import torch
 from src.feature_io import arguments,configuration,config_hash,save_features,write_json,digest
 from src.dataset import PilotDataset
+from src.model_registry import configured_models,adapter_for,regimes_for,transform_for,MODELS
 
 SMOKE={(0,0),(1,0),(-1,0),(2,0),(-2,0),(0,1),(0,-1),(0,2),(0,-2),(1,1)}
 
 def main():
     p=arguments('Extract compact endpoint features with audited physical correspondence')
     p.add_argument('--stage',choices=['smoke','full'],required=True)
-    p.add_argument('--model',choices=['all','dinov3','vggt_omega'],default='all')
+    p.add_argument('--model',choices=['all',*MODELS],default='all')
     a=p.parse_args();cfg=configuration(a);out=Path(cfg['output_root']);audit=out/'audit'
     ma=json.loads((audit/'model_audit.json').read_text()); assert ma['config_hash']==config_hash(cfg)
     if a.stage=='full':
@@ -27,17 +28,15 @@ def main():
     seqs=d.sequences
     if a.stage=='smoke':seqs=[s for s in seqs if s['group_id']==sorted(d.groups)[0] and (s['ego_level'],s['object_level']) in SMOKE]
     features=out/'features';features.mkdir(exist_ok=True)
-    for name in ['dinov3','vggt_omega']:
+    for name in configured_models(cfg):
         if a.model not in ['all',name]:continue
         assert digest(cfg[name]['checkpoint'])==ma[name]['checkpoint_sha256'],'Checkpoint changed since audit'
         for rel,sha in ma[name]['source_sha256'].items():
             assert digest(Path(cfg[name]['repo'])/rel)==sha,f'Model source changed: {rel}'
-        if name=='dinov3':from src.dinov3_adapter import DINOv3Adapter as Adapter
-        else:from src.vggt_omega_adapter import VGGTOmegaAdapter as Adapter
-        adapter=Adapter(cfg);write_json(audit/f'{name}_runtime.json',adapter.audit)
-        regimes=['Single'] if name=='dinov3' else cfg[name]['regimes']
+        adapter=adapter_for(name,cfg);write_json(audit/f'{name}_runtime.json',adapter.audit)
+        regimes=regimes_for(name);transform=transform_for(name)
         for si,s in enumerate(seqs):
-            frames=d.frames_for(s);uv=d.point_uv(s);mask=d.mask(s)
+            frames=d.frames_for(s);uv=d.point_uv(s);mask=transform.mask(d.root/frames[-1]['target_mask'])
             for regime in regimes:
                 path=features/name/regime/(s['sequence_id']+'.npz')
                 if path.exists():
@@ -47,10 +46,10 @@ def main():
                     continue
                 indices={'Single':[7],'Pair':[0,7],'Full':list(range(8))}[regime]
                 t=time.time();torch.cuda.reset_peak_memory_stats()
-                arrays,debug=adapter.extract([d.root/frames[i]['rgb'] for i in indices],uv,mask,d.transform)
+                arrays,debug=adapter.extract([d.root/frames[i]['rgb'] for i in indices],uv,mask,transform)
                 arrays={k:v.astype(cfg['storage_dtype']) for k,v in arrays.items()}
                 arrays['point_ids']=np.array(d.core[s['group_id']]['point_ids'],dtype=np.int32)
-                meta={'config_hash':config_hash(cfg),'sequence_id':s['sequence_id'],'group':s['group_id'],'e':s['ego_level'],'o':s['object_level'],'r':s['relative_level'],'model':name,'regime':regime,'frame_indices':indices,'target_observation':7,'point_ids':arrays['point_ids'].tolist(),'transform':d.transform.metadata(),'checkpoint_sha256':ma[name]['checkpoint_sha256'],'input_rgb_sha256':[da['input_sha256'][frames[i]['rgb']] for i in indices],'debug':debug,'seconds':time.time()-t,'peak_cuda_gb':torch.cuda.max_memory_allocated()/1e9,'shapes':{k:list(v.shape) for k,v in arrays.items()}}
+                meta={'config_hash':config_hash(cfg),'sequence_id':s['sequence_id'],'group':s['group_id'],'e':s['ego_level'],'o':s['object_level'],'r':s['relative_level'],'model':name,'regime':regime,'frame_indices':indices,'target_observation':7,'point_ids':arrays['point_ids'].tolist(),'transform':transform.metadata(),'checkpoint_sha256':ma[name]['checkpoint_sha256'],'input_rgb_sha256':[da['input_sha256'][frames[i]['rgb']] for i in indices],'debug':debug,'seconds':time.time()-t,'peak_cuda_gb':torch.cuda.max_memory_allocated()/1e9,'shapes':{k:list(v.shape) for k,v in arrays.items()}}
                 save_features(path,arrays,meta)
                 print(f'{a.stage} {name} {si+1}/{len(seqs)} {regime} {s["sequence_id"]} {meta["seconds"]:.2f}s peak={meta["peak_cuda_gb"]:.2f}GB',flush=True)
         del adapter;gc.collect();torch.cuda.empty_cache()

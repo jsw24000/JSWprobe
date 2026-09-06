@@ -28,8 +28,8 @@ interior filter. We do not copy that rounded lookup into feature interpolation.
 
 `SpatialTransform` explicitly stores original size, crop origin/size, resize,
 and padding offsets. This pilot uses identity spatial transforms for both
-models: RGB/mask/UV remain 512×512, with no crop or padding. Nonzero padding
-for masks is rejected until implemented. This matches Omega's official image
+models: RGB/mask/UV remain 512×512, with no crop or padding. The transform also supports symmetric padding for the patch-14 models
+described in the four-model extension below. This matches Omega's official image
 loader at square 512. DINO's RoPE builds its grid from actual input size,
 so the checkpoint's default 224 image processor resize is deliberately disabled.
 An executed 512 forward validates a 32×32 lattice for both models.
@@ -111,3 +111,41 @@ attention computation uses official bf16 autocast, DenseHead float32. Saved
 readouts are float32; metrics convert to float32 before baseline subtraction.
 The first-vs-subsequent camera/register initialization is never equated across
 Single and Pair/Full; static referencing is always within the same regime.
+
+## Four-model extension
+
+The original definitions above continue to apply to DINOv3/Omega. In four-model
+configs, `model_registry.py` selects the model-specific adapter, capabilities,
+regimes, spatial transform and expected output schema. Metrics and group
+aggregation are unchanged. Dataset-level core points are chosen once in the
+original 512-coordinate system and explicitly verified in every model input.
+
+For VGGT and DINOv2: the local audited patch size is 14, depth 24, D=1024.
+Keep the original 512 pixels and pad 3px symmetrically to 518. The transform's
+resize scale is `(input_width-2*pad_x)/crop_width`, likewise y; here exactly 1.
+RGB padding is white (1 before normalization); masks use background (0).
+UV_model=UV_original+3; the 37×37 lattice has centers at model UV=7+14j.
+The unit test checks exact RGB preservation, UV shift, corners, lattice ordering,
+and unchanged physical-point boundary distance. No old feature file is modified.
+
+DINOv2 uses native `dinov2_vitl14_reg(pretrained=False)`, then a strict load of
+its audited local pth. `get_intermediate_layers(n=[5,11,17,23],norm=True)` returns
+`[1,1369,1024]` patch-only tensors (CLS/registers are excluded by the official
+method). Patch/pool readout names remain `Lx__norm__patch/pool`. There is no
+DINOv2 pair/full aggregation or register analysis, matching the DINOv3 baseline.
+
+VGGT official aggregator outputs concatenate frame/global intermediates, just
+as E1 expects: `[1,S,1374,2048]`, pre/post split at 1024. Camera=0,
+registers=1:5, patches=5:1374. Selected layers match Omega's indices for easy
+comparison, but **none** are register-only in VGGT. The official implementation
+materializes all layers transiently; only selected endpoint compact readouts
+are saved. Dense decoding uses only the endpoint's already contextualized
+features from layers 4/11/17/23, with a full-head equivalence check.
+
+The VGGT dense hook captures `depth_head.scratch.output_conv2` input:
+`[1,128,518,518]`, after interpolation to model input resolution and position
+embedding, before the depth/confidence prediction convolutions. Sampling uses
+that map's nominal pixel-center lattice and the same transformed physical UV.
+Omega's dense auxiliary remains the original 256-channel stride-4 lattice.
+Channel count and decoder computations differ, so these auxiliary representations
+are not architecture-identical controls. All saved readouts/metrics are float32.

@@ -62,3 +62,18 @@ patch equality, DenseHead and DINO runtime shape, then a saved PASS gate.
 Full: all 100×4 shards, same validations and hashes, then metrics and figures.
 Use sequence-level atomic NPZ writes and exact compatibility gates for reuse.
 Do not modify sources or lower frames/resolution to avoid a failed gate.
+
+## Model-set configuration
+
+`e1_four_models.yaml` selects DINOv3/Omega/DINOv2/VGGT through one registry.
+The same condition pairing, static baseline, point IDs, tangent formulas,
+20 same-r pair average, compensated response, clean-patch occupancy and
+point→group aggregation apply to all models. No model-specific metric branch
+is introduced. Image encoders have only Single; both geometry models have
+Single/Pair/Full. Register median uses the actual saved register count (4 vs 16).
+
+Model input padding/patch-size differences and dense decoder differences are
+explicit model-adapter constraints, not hidden changes in data or metrics.
+Every selected model must pass the smoke gate before the full stage. Expected
+shard count is computed from the selected model/regime registry, never fixed
+to the old two-model count. New comparisons use a separate output root.

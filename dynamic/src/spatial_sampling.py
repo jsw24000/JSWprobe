@@ -18,7 +18,7 @@ class SpatialTransform:
     pad_xy: tuple = (0., 0.)
 
     def to_input(self, uv):
-        scale = np.array(self.input_hw[::-1]) / np.array(self.crop_hw[::-1])
+        scale = (np.array(self.input_hw[::-1])-2*np.array(self.pad_xy)) / np.array(self.crop_hw[::-1])
         return (np.asarray(uv) - self.crop_xy) * scale + self.pad_xy
 
     def grid(self, uv, grid_hw):
@@ -31,8 +31,24 @@ class SpatialTransform:
         if im.size != tuple(self.original_hw[::-1]): raise ValueError('Original resolution mismatch')
         x,y = self.crop_xy; h,w = self.crop_hw
         im = im.crop((int(x),int(y),int(x+w),int(y+h)))
-        if any(self.pad_xy): raise NotImplementedError('Padding requires explicit padded canvas')
-        return np.asarray(im.resize(tuple(self.input_hw[::-1]), Image.Resampling.NEAREST)) > 127
+        px,py=map(int,self.pad_xy)
+        size=(self.input_hw[1]-2*px,self.input_hw[0]-2*py)
+        mask=np.asarray(im.resize(size, Image.Resampling.NEAREST)) > 127
+        return np.pad(mask,((py,py),(px,px)),constant_values=False)
+
+    def images(self, paths):
+        """RGB [0,1], same transform as masks; symmetric white padding."""
+        px,py=map(int,self.pad_xy);result=[]
+        x,y=self.crop_xy;h,w=self.crop_hw
+        for path in paths:
+            with Image.open(path) as source:
+                im=source.convert('RGB')
+                if im.size!=tuple(self.original_hw[::-1]):raise ValueError('Original resolution mismatch')
+                im=im.crop((int(x),int(y),int(x+w),int(y+h)))
+                im=im.resize((self.input_hw[1]-2*px,self.input_hw[0]-2*py),Image.Resampling.BICUBIC)
+                a=np.pad(np.asarray(im),((py,py),(px,px),(0,0)),constant_values=255).copy()
+            result.append(torch.from_numpy(a).permute(2,0,1).float()/255)
+        return torch.stack(result)
 
 
 def boundary_distances(mask, input_uv):

@@ -12,7 +12,11 @@ from src.vggt_omega_adapter import VGGTOmegaAdapter
 
 @torch.inference_mode()
 def main():
-    c=configuration(arguments('Validate wrapper versus official forward').parse_args());out=Path(c['output_root']);d=PilotDataset(c);d.core=json.loads((out/'audit/dataset_audit.json').read_text())['core'];torch.set_num_threads(8)
+    c=configuration(arguments('Validate wrapper versus official forward').parse_args())
+    if 'models' in c:
+        from src.fidelity import check_models
+        check_models(c);return
+    out=Path(c['output_root']);d=PilotDataset(c);d.core=json.loads((out/'audit/dataset_audit.json').read_text())['core'];torch.set_num_threads(8)
     torch.backends.cuda.matmul.allow_tf32=False;torch.backends.cudnn.allow_tf32=False
     s=next(s for s in d.sequences if s['group_id']==sorted(d.groups)[0] and s['is_static']);paths=[d.root/f['rgb'] for f in d.frames_for(s)];uv=d.point_uv(s)
     adapter=VGGTOmegaAdapter(c);arrays,debug=adapter.extract(paths,uv,d.mask(s),d.transform)
