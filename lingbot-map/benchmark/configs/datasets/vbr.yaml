@@ -1,3 +1,0 @@
-dataset: vbr
-raw_data_root: /data2/datasets/vbr
-_target_size: [504, 280]

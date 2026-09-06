@@ -3,6 +3,13 @@
 This folder was consolidated into a single top-level JSWprobe repository.
 The nested `.git` directories were removed after recording their provenance here.
 
+As of 2026-09-06, `dinov2` and `lingbot-map` have been moved to
+`~/Desktop/dinov2` and `~/Desktop/lingbot-map`. Their former top-level paths
+are now untracked and ignored in JSWprobe. The Desktop copies are external
+dependencies and are not backed up by pushing this repository. The table below
+preserves their original provenance; earlier Git commits retain the vendored files.
+Model weights and generated experiment outputs remain ignored.
+
 | Path | Original remote | Branch | Commit |
 | --- | --- | --- | --- |
 | `lingbot-map` | `git@github.com:Robbyant/lingbot-map.git` | `main` | `53f7ef4828f44d274d7c0c0c23d606fb9f53703a` |

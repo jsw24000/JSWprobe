@@ -1,3 +1,7 @@
+# External model repositories moved to ~/Desktop
+/dinov2/
+/lingbot-map/
+
 # Python caches and local tooling
 __pycache__/
 *.py[cod]
