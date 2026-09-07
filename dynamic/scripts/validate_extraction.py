@@ -4,6 +4,7 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import numpy as np
 from src.feature_io import arguments,configuration,config_hash,read_jsonl,write_json,digest
+from src.dataset import PilotDataset
 from extract_e1_features import SMOKE
 from src.model_registry import configured_models,regimes_for,expected_shapes,shards_per_sequence,MODELS,transform_for
 
@@ -11,7 +12,7 @@ def main():
     p=arguments('Validate exact extraction coverage and correctness before analysis');p.add_argument('--stage',choices=['smoke','full'],required=True)
     a=p.parse_args();c=configuration(a);out=Path(c['output_root']);da=json.loads((out/'audit/dataset_audit.json').read_text());ma=json.loads((out/'audit/model_audit.json').read_text())
     frames={f['frame_id']:f for f in read_jsonl(Path(c['dataset_root'])/'manifests/frames.jsonl')}
-    seqs=read_jsonl(Path(c['dataset_root'])/'manifests/sequences.jsonl')
+    seqs=PilotDataset(c).sequences
     if a.stage=='smoke':seqs=[s for s in seqs if s['group_id']==sorted(da['core'])[0] and (s['ego_level'],s['object_level']) in SMOKE]
     rows=read_jsonl(out/'features/feature_manifest.jsonl');by={(r['sequence_id'],r['model'],r['regime']):r for r in rows};assert len(by)==len(rows)
     checked=[];maxerror=0.;nonfinite=0

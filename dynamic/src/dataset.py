@@ -7,11 +7,33 @@ from .feature_io import read_jsonl, digest
 from .spatial_sampling import SpatialTransform, boundary_distances, farthest_points, occupancy
 
 
+def select_motion_families(sequences, family_ids=None):
+    """Keep a homogeneous axis/scale run; V1 without a filter is unchanged."""
+    if family_ids is not None:
+        if not isinstance(family_ids, (list, tuple)) or not family_ids:
+            raise ValueError('motion_family_ids must be a nonempty list')
+        available = {s.get('motion_family_id') for s in sequences}
+        unknown = set(family_ids) - available
+        if unknown:
+            raise ValueError(f'Unavailable motion_family_ids: {sorted(unknown)}')
+        sequences = [s for s in sequences if s.get('motion_family_id') in family_ids]
+    protocols = {(s.get('delta_m'), tuple(s.get('motion_axis_world', [1, 0, 0]))) for s in sequences}
+    if len(protocols) > 1:
+        raise ValueError('E1 requires one homogeneous motion family per run; set motion_family_ids: [tx_d004] or another single family')
+    if not sequences:
+        raise ValueError('No sequences selected')
+    return sequences
+
+
 class PilotDataset:
     def __init__(self, cfg):
         self.cfg=cfg; self.root=Path(cfg['dataset_root'])
         self.sequences=sorted(read_jsonl(self.root/'manifests/sequences.jsonl'),key=lambda s:s['sequence_id'])
+        self.sequences=select_motion_families(self.sequences, cfg.get('motion_family_ids'))
         self.frames={f['frame_id']:f for f in read_jsonl(self.root/'manifests/frames.jsonl')}
+        if cfg.get('motion_family_ids') is not None:
+            selected_frames={fid for s in self.sequences for fid in s['frame_ids']}
+            self.frames={fid:f for fid,f in self.frames.items() if fid in selected_frames}
         self.groups=defaultdict(list)
         for s in self.sequences: self.groups[s['group_id']].append(s)
         self.transform=SpatialTransform(input_hw=tuple(cfg['input_resolution']))

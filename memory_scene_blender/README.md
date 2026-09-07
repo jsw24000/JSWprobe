@@ -413,3 +413,159 @@ The generator computes:
 - In the simplified profile, the non-target geometry is intentionally limited to the room shell plus one long central occluder block. The target has no decoys or nearby distractor objects.
 - In the simplified v2 profile, the target is moved from `(1.62, -0.74, 0.42)` to `(1.62, 0.74, 0.42)`. The loop start/end camera positions remain matched to the simplified v1 path, while the intervening loop cameras are interpolated to preserve the same target-visible frame window.
 - The script writes a per-condition contact sheet and `summary.txt` for fast visual checks.
+
+
+## Ego/object factorial V2: confirmation across physical contexts
+
+`ego_object_factorial_v2` builds novel procedural scenes without requiring any
+`object_translation_v1` output or claiming exact source-scene reconstruction.
+**Core `tx_d004` is the direct E1 replication panel:** world-X translation,
+0.04 m per level, levels `[-2,-1,0,1,2]`, 25 Cartesian conditions, 8 linear-time
+frames, 512×512, and 8 full-render samples. Lighting/materials belong to scene
+context; there are no rotation, Z, non-rigid, or lighting-control interventions.
+
+The 12 existing targets (four furniture categories × variants 0–2) each appear
+in two of six backgrounds, yielding 24 contexts. Crossing uses
+`b=(2*v+c+offset)%6`, offset 0 or 1; every background has one target per category.
+The extension uses variant `c%2` in each category, retaining both of that target's
+background contexts: 8 contexts, 2/category, covering all six backgrounds.
+It adds X/Y translation at 0.02/0.04/0.06 m. Core `tx_d004` is stored once and
+belongs to both panels in extension contexts. Total: **24 contexts, 64 groups,
+1,600 sequences, 12,800 frames**. Auxiliary X/Y scales must be analyzed separately
+from primary confirmation aggregation unless an explicit factor analysis is intended.
+
+The static asset builder indexes layouts modulo 3. To obtain six distinct
+room/static combinations without changing asset definitions, background room
+indices are `[0,1,2,1,2,0]`, with static IDs `[0,1,2,3,4,5]`. Thus the second trio
+uses different room/static pairings, rather than repeating the first trio.
+
+V2 selects the first valid anchor/camera in deterministic candidate order.
+An extension's single anchor and base camera must pass swept-room/collision and
+all temporal camera/visibility checks for all six families. Initial size is a
+projected bounding-box estimate; the post-render validator checks actual masks.
+Failure preserves a selection report and stops; no planned context is replaced.
+Canonical files live at `canonical_targets/<target_id>/canonical_surface_points.npz`;
+the seed depends only on dataset seed and target identity. Render caching uses
+six rounded world-translation coordinates at physical-context scope. Reused
+render bytes do not share sequence metadata or tracks.
+
+The `manifests/` directory retains scenes, anchors, base_cameras, groups, sequences,
+frames, matched_relative_groups and track_sets, and adds targets, backgrounds,
+contexts and motion_families. All manifest paths are dataset-root-relative.
+`scene_id=context_id`; explicit identity columns carry background, target,
+physical context, motion family and panel membership. Matched-relative groups
+use `(group_id, relative_level)`, so axes/scales cannot merge. `splits.json`
+explicitly leaves contexts unassigned; define task-specific splits before fitting.
+`context_plan.json`, config/provenance hashes, seeds, Blender/Git information,
+`selection_report.json`, and `reports/{coverage_summary.json,coverage_matrix.csv,
+selection_summary.csv,projected_motion_scale.csv}` support audits, not scientific
+conclusions. The 12×6 coverage matrix describes the full planned crossing;
+coverage summary also reports actually generated counts.
+
+Run commands from `/home/3dsm/Desktop/JSWprobe`. Existing nonempty output roots
+are refused; choose a fresh `--output-root` to repeat a smoke. There is no automatic
+overwrite or resume. Geometry outputs are separate from rendered outputs.
+
+```bash
+# Six-family geometry smoke, no image rendering
+/home/3dsm/.local/bin/blender --background --python-exit-code 1 \
+  --python memory_scene_blender/scripts/generate_ego_object_factorial_v2.py -- \
+  --config memory_scene_blender/configs/ego_object_factorial_v2.yaml \
+  --mode smoke --dry-run --smoke-all-families --output-root /tmp/ego_object_v2_geometry_smoke
+python memory_scene_blender/scripts/validate_ego_object_factorial_v2.py \
+  --dataset-root /tmp/ego_object_v2_geometry_smoke --geometry-only
+
+# Real small smoke: one context, tx_d004, 25 sequences, 200 frames, 4 samples
+/home/3dsm/.local/bin/blender --background --python-exit-code 1 \
+  --python memory_scene_blender/scripts/generate_ego_object_factorial_v2.py -- \
+  --config memory_scene_blender/configs/ego_object_factorial_v2.yaml --mode smoke
+python memory_scene_blender/scripts/validate_ego_object_factorial_v2.py \
+  --dataset-root memory_scene_blender/outputs/ego_object_factorial_v2/smoke
+python memory_scene_blender/scripts/render_ego_object_factorial_v2_preview.py \
+  --dataset-root memory_scene_blender/outputs/ego_object_factorial_v2/smoke
+```
+
+Full commands below are for later manual execution. Implementation/smoke testing
+does **not** create the full dataset. A real full render requires `--allow-full`.
+
+```bash
+/home/3dsm/.local/bin/blender --background --python-exit-code 1 \
+  --python memory_scene_blender/scripts/generate_ego_object_factorial_v2.py -- \
+  --config memory_scene_blender/configs/ego_object_factorial_v2.yaml \
+  --mode full --allow-full
+python memory_scene_blender/scripts/validate_ego_object_factorial_v2.py \
+  --dataset-root memory_scene_blender/outputs/ego_object_factorial_v2/full
+python memory_scene_blender/scripts/render_ego_object_factorial_v2_preview.py \
+  --dataset-root memory_scene_blender/outputs/ego_object_factorial_v2/full --max-groups 2
+```
+
+Later feature extraction uses `dynamic/configs/e1_v2_core_template.yaml`, which
+selects `motion_family_ids: [tx_d004]`. The adapter filters before grouping/audit;
+heterogeneous axes/scales are rejected, including at analysis entry. Extraction
+validation uses the same selection. V1 configs need no changes. After full render
+validation, the existing staged extraction workflow can be run manually:
+
+```bash
+/home/3dsm/miniconda3/envs/repr_vggt_dinov3/bin/python dynamic/scripts/audit_e1.py \
+  --config dynamic/configs/e1_v2_core_template.yaml
+/home/3dsm/miniconda3/envs/repr_vggt_dinov3/bin/python dynamic/scripts/extract_e1_features.py \
+  --config dynamic/configs/e1_v2_core_template.yaml --stage smoke
+/home/3dsm/miniconda3/envs/repr_vggt_dinov3/bin/python dynamic/scripts/validate_extraction.py \
+  --config dynamic/configs/e1_v2_core_template.yaml --stage smoke
+/home/3dsm/miniconda3/envs/repr_vggt_dinov3/bin/python dynamic/scripts/extract_e1_features.py \
+  --config dynamic/configs/e1_v2_core_template.yaml --stage full
+/home/3dsm/miniconda3/envs/repr_vggt_dinov3/bin/python dynamic/scripts/validate_extraction.py \
+  --config dynamic/configs/e1_v2_core_template.yaml --stage full
+```
+
+This task does not redesign E1 scientific reports: some narrative remains pilot
+specific, so review it before using report text for V2. V1 generators, configs,
+asset definitions, exact-rebuild selection, X-axis defaults, and existing outputs
+are unchanged. Blender-free regression tests:
+
+```bash
+python -m unittest discover -s memory_scene_blender/tests
+/home/3dsm/miniconda3/envs/repr_vggt_dinov3/bin/python -m unittest discover -s dynamic/tests
+```
+
+Additional reproducible smoke audits (fresh report paths required):
+
+```bash
+/home/3dsm/.local/bin/blender --background --python-exit-code 1 \
+  --python memory_scene_blender/tests/blender_v2_canonical_smoke.py -- \
+  --output-report /tmp/ego_object_v2_canonical_identity.json
+python memory_scene_blender/tests/v2_validation_mutations.py \
+  --dataset-root /tmp/ego_object_v2_geometry_smoke \
+  --output-report /tmp/ego_object_v2_validation_mutations.json
+```
+
+The canonical audit constructs all 24 scenes and compares 12 target identities
+across backgrounds; it renders zero frames. Mutation checks use temporary copies
+and first require a passing baseline. Geometry validation reports its effective
+precision floors (2e-6 m for same-r coordinates and 2e-7 m for object displacement),
+accounting for Blender float32 transforms and the existing eight-decimal matrix
+serialization. UV tolerances remain configuration controlled.
+
+
+V2 depth calibration on this machine: Blender 5.2 `BLENDER_EEVEE` Z-pass is
+**axial camera Z**, confirmed against scene ray casts. V2 keeps native axial
+`depth.exr` and `native_depth.npy`, while `depth.npy` contains Euclidean ray range
+computed using pixel-center rays and saved K. This lets the existing sparse-track
+visibility helper consume its declared range units. The validator checks this
+conversion and then independently resamples mask/depth visibility. Other Blender
+versions/backends are rejected until calibrated. V1 depth artifacts/code are unchanged.
+
+The initial rendered smoke at `outputs/ego_object_factorial_v2/smoke` predates this
+correction and is retained with its failed validation. The corrected, validated
+copy is `outputs/ego_object_factorial_v2/smoke_depth_checked`; RGB and native EXR
+bytes are reused, with normalized NPY depth and recomputed visibility. Reproduce
+that conversion only to a fresh destination:
+
+```bash
+python memory_scene_blender/scripts/normalize_ego_object_v2_smoke_depth.py \
+  --source-root memory_scene_blender/outputs/ego_object_factorial_v2/smoke \
+  --output-root /tmp/ego_object_v2_corrected_smoke
+```
+
+New generation performs depth normalization automatically. The conversion tool
+accepts only the initial V2 smoke schema, never V1 or full datasets.
