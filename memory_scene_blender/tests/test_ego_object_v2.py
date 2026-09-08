@@ -107,5 +107,13 @@ class V2Protocol(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'smoke --dry-run'):
             generate_dataset(parse_args(['--smoke-all-families']))
 
+    def test_scoped_repair_arguments(self):
+        args=parse_args(['--mode','full','--allow-full','--context-id','bg_003__chair_v01',
+                         '--context-id','bg_003__side_table_v00','--camera-distance-scale','0.65',
+                         '--context-camera-distance-scale','bg_003__side_table_v00=0.62'])
+        self.assertEqual(args.context_ids,['bg_003__chair_v01','bg_003__side_table_v00'])
+        self.assertEqual(args.camera_distance_scale,0.65)
+        self.assertEqual(args.context_camera_distance_scale,['bg_003__side_table_v00=0.62'])
+
 
 if __name__=='__main__':unittest.main()

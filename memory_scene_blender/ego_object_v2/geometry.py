@@ -70,7 +70,23 @@ def evaluate_camera(bundle, canonical, xy, camera, families, settings, cfg):
     return dict(valid=valid, **minimum, tested_physical_states=len(seen), initial_projected_bbox_area_ratio=initial_ratio)
 
 
-def select_physical_context(bundle, canonical, families, settings, cfg, report):
+def scaled_camera_distance(camera, scale, camera_config, resolution):
+    """Move a base camera toward its look-at point while preserving its rotation."""
+    if not 0.0 < scale < 1.0:
+        raise ValueError('camera distance scale must be strictly between 0 and 1')
+    matrix = np.asarray(camera['blender_camera_to_world'], dtype=np.float64).copy()
+    position = matrix[:3, 3]
+    look_at = np.asarray(camera['look_at'], dtype=np.float64)
+    matrix[:3, 3] = look_at + scale * (position - look_at)
+    camera_id = f"{camera['camera_id']}__near_{int(round(scale * 1000)):03d}"
+    result = camera_payload_from_matrix(
+        camera_id, matrix, *resolution, camera_config, look_at.tolist(), camera['is_primary'])
+    return dict(result, scene_id=camera['scene_id'], distance_scale=float(scale),
+                source_camera_id=camera['camera_id'])
+
+
+def select_physical_context(bundle, canonical, families, settings, cfg, report,
+                            camera_distance_scale=None, camera_config=None):
     """First valid anchor/camera in stable ID order; never replace a planned context."""
     for pos in bundle.positions:
         sb.set_target_position(bundle.target_asset, pos['xy'])
@@ -81,7 +97,13 @@ def select_physical_context(bundle, canonical, families, settings, cfg, report):
         candidate = dict(anchor_id=pos['state_id'].replace('state','anchor'), xy=pos['xy'], sweeps=sweeps, cameras=[])
         report['candidates'].append(candidate)
         if not all(s['valid'] for s in sweeps.values()): continue
-        for camera in bundle.cameras:
+        cameras = bundle.cameras
+        if camera_distance_scale is not None:
+            if camera_config is None:
+                raise ValueError('camera_config is required for distance-scaled selection')
+            cameras = [scaled_camera_distance(c, camera_distance_scale, camera_config,
+                                              settings['resolution']) for c in bundle.cameras]
+        for camera in cameras:
             result = evaluate_camera(bundle, canonical, pos['xy'], camera, families, settings, cfg)
             candidate['cameras'].append(dict(camera_id=camera['camera_id'], **result))
             if result['valid']:

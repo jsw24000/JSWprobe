@@ -33,6 +33,12 @@ def parse_args(argv=None):
     p.add_argument('--allow-full', action='store_true')
     p.add_argument('--output-root', type=Path)
     p.add_argument('--smoke-all-families', action='store_true', help='Geometry-only smoke for all six matched families')
+    p.add_argument('--context-id', action='append', dest='context_ids',
+                   help='Generate only this planned context (repeatable; requires --mode full)')
+    p.add_argument('--camera-distance-scale', type=float,
+                   help='Move candidate cameras toward look-at by this factor; intended for scoped repair')
+    p.add_argument('--context-camera-distance-scale', action='append', default=[], metavar='CONTEXT_ID=SCALE',
+                   help='Override camera distance scale for one requested context')
     return p.parse_args(argv)
 
 
@@ -76,6 +82,18 @@ def generate_dataset(args):
         raise ValueError('Real full rendering requires explicit --allow-full')
     if args.smoke_all_families and (args.mode != 'smoke' or not args.dry_run):
         raise ValueError('--smoke-all-families requires smoke --dry-run')
+    if args.context_ids and args.mode != 'full':
+        raise ValueError('--context-id requires --mode full')
+    if args.camera_distance_scale is not None and not args.context_ids:
+        raise ValueError('--camera-distance-scale requires --context-id')
+    scale_overrides = {}
+    for item in args.context_camera_distance_scale:
+        context_id, separator, value = item.partition('=')
+        if not separator:
+            raise ValueError('--context-camera-distance-scale must be CONTEXT_ID=SCALE')
+        scale_overrides[context_id] = float(value)
+    if scale_overrides and not args.context_ids:
+        raise ValueError('--context-camera-distance-scale requires --context-id')
     import bpy
     config = load_config(args.config)
     plan = make_plan(config)
@@ -97,6 +115,16 @@ def generate_dataset(args):
     base_path = PROJECT_ROOT/config['base_config']
     base = load_config(base_path)
     contexts = plan['contexts'] if args.mode=='full' else [next(c for c in plan['contexts'] if c['extension'])]
+    if args.context_ids:
+        requested = list(dict.fromkeys(args.context_ids))
+        known = {c['context_id'] for c in plan['contexts']}
+        unknown = sorted(set(requested) - known)
+        if unknown:
+            raise ValueError(f'Unknown planned context IDs: {unknown}')
+        contexts = [c for c in plan['contexts'] if c['context_id'] in requested]
+        unused_overrides = sorted(set(scale_overrides) - set(requested))
+        if unused_overrides:
+            raise ValueError(f'Camera scale overrides are outside the requested contexts: {unused_overrides}')
     realized = []
     for context in contexts:
         families = context['motion_family_ids'] if args.mode=='full' or args.smoke_all_families else settings['motion_family_ids']
@@ -137,7 +165,10 @@ def generate_dataset(args):
         # Even single-family rendered smoke selects a context valid for all extension families.
         selection_families=[family_by_id[f] for f in context['motion_family_ids']]
         try:
-            selected,base_camera,selection=select_physical_context(bundle,canonical['xyz_object_local'],selection_families,settings,config['selection'],report)
+            context_scale = scale_overrides.get(scene_id_value, args.camera_distance_scale)
+            selected,base_camera,selection=select_physical_context(
+                bundle,canonical['xyz_object_local'],selection_families,settings,
+                config['selection'],report,context_scale,base['camera'])
         except Exception:
             write_json(output_root/'selection_report.json',dict(ok=False,contexts=selection_reports))
             raise
@@ -388,9 +419,16 @@ def generate_dataset(args):
     for name,rows in manifests.items(): write_jsonl(output_root/'manifests'/f'{name}.jsonl',rows)
     write_json(output_root/'manifests/splits.json',dict(policy='unassigned; define task-specific splits before fitting',unassigned_scenes=[c['context_id'] for c in realized]))
     counts=dict(contexts=len(scene_rows),groups=len(group_rows),sequences=len(sequence_rows),frames=len(frame_rows))
-    expected=FULL_COUNTS if args.mode=='full' else dict(contexts=1,groups=len(realized[0]['generated_motion_family_ids']),sequences=25*len(realized[0]['generated_motion_family_ids']),frames=200*len(realized[0]['generated_motion_family_ids']))
+    expected=(dict(contexts=len(realized),groups=sum(len(c['generated_motion_family_ids']) for c in realized),
+                   sequences=25*sum(len(c['generated_motion_family_ids']) for c in realized),
+                   frames=200*sum(len(c['generated_motion_family_ids']) for c in realized))
+              if args.context_ids else FULL_COUNTS if args.mode=='full' else
+              dict(contexts=1,groups=len(realized[0]['generated_motion_family_ids']),sequences=25*len(realized[0]['generated_motion_family_ids']),frames=200*len(realized[0]['generated_motion_family_ids'])))
     if counts != expected: raise RuntimeError(f'Incomplete plan: {counts} != {expected}')
-    summary=dict(dataset_name=config['dataset_name'],mode=args.mode,dry_run=args.dry_run,counts=counts,complete=True,full_dataset_was_started=args.mode=='full' and not args.dry_run)
+    summary=dict(dataset_name=config['dataset_name'],mode=args.mode,dry_run=args.dry_run,counts=counts,complete=True,
+                 full_dataset_was_started=args.mode=='full' and not args.dry_run,
+                 subset_context_ids=args.context_ids or [],camera_distance_scale=args.camera_distance_scale,
+                 context_camera_distance_scales=scale_overrides)
     write_json(output_root/'dataset_summary.json',summary)
     from memory_scene_blender.ego_object_v2.reports import write_reports
     write_reports(output_root,plan,manifests)

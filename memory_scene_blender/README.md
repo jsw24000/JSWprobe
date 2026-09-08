@@ -499,6 +499,36 @@ python memory_scene_blender/scripts/render_ego_object_factorial_v2_preview.py \
   --dataset-root memory_scene_blender/outputs/ego_object_factorial_v2/full --max-groups 2
 ```
 
+To repair only the two small-target contexts, render into a fresh staging root.
+The chair keeps more image-edge margin at 65% of its original camera distance;
+the smaller side table uses 62%. This produces exactly 2 contexts, 7 groups,
+175 sequences and 1400 frames. The apply step first checks every rendered frame,
+then transactionally replaces those context directories and manifest rows; a
+failed full validation restores the old data.
+
+```bash
+/home/3dsm/.local/bin/blender --background --python-exit-code 1 \
+  --python memory_scene_blender/scripts/generate_ego_object_factorial_v2.py -- \
+  --config memory_scene_blender/configs/ego_object_factorial_v2.yaml \
+  --mode full --allow-full \
+  --context-id bg_003__chair_v01 \
+  --context-id bg_003__side_table_v00 \
+  --camera-distance-scale 0.65 \
+  --context-camera-distance-scale bg_003__side_table_v00=0.62 \
+  --output-root memory_scene_blender/outputs/ego_object_factorial_v2/repair_bg003_near
+
+# Read-only acceptance of the staged replacement.
+python memory_scene_blender/scripts/apply_ego_object_factorial_v2_context_repair.py \
+  --dataset-root memory_scene_blender/outputs/ego_object_factorial_v2/full \
+  --replacement-root memory_scene_blender/outputs/ego_object_factorial_v2/repair_bg003_near
+
+# Install only after the read-only command reports ok=true.
+python memory_scene_blender/scripts/apply_ego_object_factorial_v2_context_repair.py \
+  --dataset-root memory_scene_blender/outputs/ego_object_factorial_v2/full \
+  --replacement-root memory_scene_blender/outputs/ego_object_factorial_v2/repair_bg003_near \
+  --apply
+```
+
 Later feature extraction uses `dynamic/configs/e1_v2_core_template.yaml`, which
 selects `motion_family_ids: [tx_d004]`. The adapter filters before grouping/audit;
 heterogeneous axes/scales are rejected, including at analysis entry. Extraction
