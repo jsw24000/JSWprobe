@@ -95,13 +95,19 @@ def inspect_replacement(full_root, replacement_root, min_mask_ratio):
 def merged_rows(full_root, replacement_root, name, context_ids):
     old = read_jsonl(full_root/'manifests'/f'{name}.jsonl')
     new = read_jsonl(replacement_root/'manifests'/f'{name}.jsonl')
+    def context_id(row):
+        # track_sets follows the older schema and carries scene_id=context_id.
+        value = row.get('context_id', row.get('scene_id'))
+        if value is None:
+            raise ValueError(f'{name} row has neither context_id nor scene_id')
+        return value
     by_context = {}
     for row in new:
-        by_context.setdefault(row['context_id'], []).append(row)
+        by_context.setdefault(context_id(row), []).append(row)
     result = []
     inserted = set()
     for row in old:
-        cid = row['context_id']
+        cid = context_id(row)
         if cid in context_ids:
             if cid not in inserted:
                 result.extend(by_context[cid]); inserted.add(cid)
@@ -115,7 +121,6 @@ def merged_rows(full_root, replacement_root, name, context_ids):
 def apply_replacement(full_root, replacement_root, audit):
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     backup = full_root.parent/f'.context_repair_backup_{stamp}'
-    backup.mkdir()
     context_ids = set(audit['context_ids'])
     staged = {}
     for name in CONTEXT_MANIFESTS:
@@ -123,6 +128,7 @@ def apply_replacement(full_root, replacement_root, audit):
     staged['matched_relative_groups'] = matched_relative_groups(staged['sequences'])
 
     top_files = ('selection_report.json','provenance.json','dataset_summary.json','validation_summary.json')
+    backup.mkdir()
     try:
         shutil.move(str(full_root/'manifests'), str(backup/'manifests'))
         shutil.move(str(full_root/'reports'), str(backup/'reports'))
