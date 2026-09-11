@@ -1,10 +1,11 @@
-import argparse,copy,sys,unittest
+import argparse,copy,json,sys,unittest
 from collections import defaultdict
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import numpy as np
 from src.e2_dataset import E2Dataset,EXPECTED_FAMILIES,intersect_canonical,validate_cache_metadata
-from src.feature_io import configuration,exclusive_file_lock,records_hash
+from src.feature_io import configuration,exclusive_file_lock,json_safe,records_hash
+from src.model_registry import transform_for
 
 PANELS={
  'core_x_confirmation':{'families':['tx_d004'],'context_rule':'all','core':'core_tx004'},
@@ -64,5 +65,10 @@ class E2DatasetTests(unittest.TestCase):
         rows=[{'path':'b','sha256':'2'},{'path':'a','sha256':'1'}]
         self.assertEqual(records_hash(rows),records_hash(list(reversed(rows))))
         self.assertNotEqual(records_hash(rows),records_hash(rows+[{'path':'c','sha256':'3'}]))
+
+    def test_preprocessing_metadata_survives_json_roundtrip(self):
+        runtime=transform_for('dinov3').metadata()
+        stored=json.loads(json.dumps(runtime))
+        self.assertEqual(stored,json_safe(runtime))
 
 if __name__=='__main__':unittest.main()

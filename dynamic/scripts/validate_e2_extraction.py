@@ -4,7 +4,7 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import numpy as np
 from src.e2_dataset import E2Dataset,validate_cache_metadata
-from src.feature_io import arguments,configuration,config_hash,digest,read_jsonl,records_hash,write_json
+from src.feature_io import arguments,configuration,config_hash,digest,json_safe,read_jsonl,records_hash,write_json
 from src.model_registry import MODELS,configured_models,expected_shapes,regimes_for,transform_for
 
 def main():
@@ -33,7 +33,7 @@ def main():
                     if set(z.files)!=expected_keys:raise ValueError(f'Unexpected arrays in {path}')
                     nonfinite+=sum(int((~np.isfinite(z[k])).sum()) for k in expected_keys-{'metadata_json'})
                 if MODELS[model]['family']=='geometry':max_register_error=max(max_register_error,max(r['debug']['register_only_patch_max_errors'].values(),default=0.))
-                if r['preprocessing_transform']!=transform_for(model).metadata():raise ValueError(f'Preprocessing drift: {model}')
+                if r['preprocessing_transform']!=json_safe(transform_for(model).metadata()):raise ValueError(f'Preprocessing drift: {model}')
                 checked.append(r['path'])
     if nonfinite or max_register_error>1e-6:raise ValueError(f'Invalid features: nonfinite={nonfinite}, register_error={max_register_error}')
     result={'passed':True,'experiment':'E2','panel':a.panel,'stage':a.stage,'config_hash':config_hash(c),'shards_checked':len(checked),
