@@ -4,7 +4,7 @@ from pathlib import Path
 import itertools
 import json
 import numpy as np
-from .feature_io import read_jsonl,digest
+from .feature_io import read_jsonl,digest,json_safe
 from .spatial_sampling import SpatialTransform,boundary_distances,farthest_points
 
 EXPECTED_FAMILIES=('tx_d002','tx_d004','tx_d006','ty_d002','ty_d004','ty_d006')
@@ -173,5 +173,6 @@ class E2Dataset:
 
 def validate_cache_metadata(metadata,expected):
     for key,value in expected.items():
-        if metadata.get(key)!=value:raise ValueError(f'Feature cache mismatch for {key}: {metadata.get(key)!r} != {value!r}')
+        stored=json_safe(metadata.get(key));wanted=json_safe(value)
+        if stored!=wanted:raise ValueError(f'Feature cache mismatch for {key}: {stored!r} != {wanted!r}')
     return True

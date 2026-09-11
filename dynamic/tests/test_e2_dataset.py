@@ -70,5 +70,8 @@ class E2DatasetTests(unittest.TestCase):
         runtime=transform_for('dinov3').metadata()
         stored=json.loads(json.dumps(runtime))
         self.assertEqual(stored,json_safe(runtime))
+        self.assertTrue(validate_cache_metadata(
+            {'preprocessing_transform':stored},
+            {'preprocessing_transform':runtime}))
 
 if __name__=='__main__':unittest.main()
