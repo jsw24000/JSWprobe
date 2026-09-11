@@ -1,0 +1,38 @@
+model_config: e1_four_models.yaml
+experiment: E2
+dataset_root: /home/3dsm/Desktop/JSWprobe/memory_scene_blender/outputs/ego_object_factorial_v2/full
+output_root: /home/3dsm/Desktop/JSWprobe/dynamic/outputs/e2_full_v2
+seed: 20260911
+input_resolution: [512, 512]
+device: cuda:0
+amp_dtype: bfloat16
+storage_dtype: float32
+min_mask_boundary_distance_px: 8
+clean_patch_occupancy: 0.9
+min_core_points: 8
+max_core_points: 64
+rank_relative_tolerance: 0.001
+well_conditioned_rho: 0.05
+epsilon: 1.0e-8
+scale_deltas_m: [0.02, 0.04, 0.06]
+panels:
+  core_x_confirmation:
+    families: [tx_d004]
+    context_rule: all
+    core: core_tx004
+  xy_d004:
+    families: [tx_d004, ty_d004]
+    context_rule: extended
+    core: core_xy004
+  representation_specialization:
+    families: [tx_d004, ty_d004]
+    context_rule: extended
+    core: core_xy004
+  scale_locality:
+    families: [tx_d002, tx_d004, tx_d006, ty_d002, ty_d004, ty_d006]
+    context_rule: extended
+    core: core_scale6
+stages:
+  stage1: [core_x_confirmation]
+  stage2: [core_x_confirmation, xy_d004, representation_specialization]
+  stage3: [core_x_confirmation, xy_d004, representation_specialization, scale_locality]

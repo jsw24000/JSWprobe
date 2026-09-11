@@ -160,3 +160,18 @@ Results: `outputs/e1_four_models/report/E1_REPORT.md`, `E1_SUMMARY.json`,
 `figures/figure3_four_model_causal_distance.{png,pdf}` and the shared CSV schemas.
 The joint report is generated from measured model-specific tables, not the
 interpretive prose of the earlier two-model run.
+
+## E2 V2 four-panel experiment
+
+E2 is an additive, separately named pipeline using the validated 24-context V2
+dataset and `outputs/e2_full_v2/`. It preserves E1 adapters and metrics, adds
+physical-context-level X/Y point matching, relative/common response geometry,
+rank-safe 2-D tangent-like subspaces, decomposed same-r controls, and cross-scale
+locality diagnostics. Start with the no-forward planner:
+
+```bash
+python dynamic/scripts/plan_e2.py --config dynamic/configs/e2_full_v2.yaml --panel all
+```
+
+Exact staged commands, metric definitions, cache behavior, output tables, and
+scientific wording constraints are in [the E2 protocol](docs/e2_protocol.md).

@@ -2,6 +2,8 @@ import argparse
 import hashlib
 import json
 import os
+import fcntl
+from contextlib import contextmanager
 from pathlib import Path
 import numpy as np
 import yaml
@@ -48,6 +50,12 @@ def arguments(description):
 
 def configuration(args):
     cfg = yaml.safe_load(Path(args.config).read_text())
+    if cfg.get('model_config'):
+        base_path=Path(cfg['model_config'])
+        if not base_path.is_absolute():base_path=(Path(args.config).resolve().parent/base_path).resolve()
+        base=yaml.safe_load(base_path.read_text())
+        base.update(cfg);cfg=base
+        cfg['model_config']=str(base_path)
     for key in ['dataset_root', 'output_root', 'device']:
         if getattr(args, key, None): cfg[key] = getattr(args, key)
     if getattr(args,'models',None):cfg['models']=args.models
@@ -61,6 +69,11 @@ def config_hash(cfg):
     return hashlib.sha256(json.dumps(cfg, sort_keys=True).encode()).hexdigest()
 
 
+def records_hash(rows):
+    """Stable hash for a selected manifest subset; unaffected by unrelated cache additions."""
+    return hashlib.sha256(json.dumps(json_safe(sorted(rows,key=lambda x:x.get('path',''))),sort_keys=True).encode()).hexdigest()
+
+
 def save_features(path, arrays, metadata):
     path = Path(path); path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists(): raise FileExistsError(path)
@@ -71,3 +84,16 @@ def save_features(path, arrays, metadata):
     with open(tmp, 'wb') as f:
         np.savez_compressed(f, **arrays, metadata_json=np.array(json.dumps(json_safe(metadata))))
     os.replace(tmp, path)
+
+
+@contextmanager
+def exclusive_file_lock(path):
+    """Single-writer advisory lock; the OS releases it if the process exits."""
+    path=Path(path);path.parent.mkdir(parents=True,exist_ok=True);handle=path.open('a+')
+    try:
+        try:fcntl.flock(handle.fileno(),fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError as exc:raise RuntimeError(f'Another extraction writer holds {path}') from exc
+        handle.seek(0);handle.truncate();handle.write(str(os.getpid())+'\n');handle.flush()
+        yield
+    finally:
+        fcntl.flock(handle.fileno(),fcntl.LOCK_UN);handle.close()
